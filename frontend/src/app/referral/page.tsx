@@ -128,35 +128,37 @@ export default function ReferralPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#faf8ff] text-[#131b2e] pb-24">
+    <div className="min-h-screen bg-[#f0f8fb] text-[#192531] pb-24">
       {/* Header Banner */}
-      <section className="bg-white border-b border-[#e2e8f0] py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <section className="bg-white border-b border-[#d6e8f0] py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#006194]">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#2b7f8f]">
               <span className="material-symbols-outlined text-sm">stethoscope</span>
-              <span>Clinical Referral & Telehealth Network</span>
+              <span>{language === "bn" ? "ডাক্তার ও চর্মরোগ বিশেষজ্ঞ ডিরেক্টরি" : "Dermatologist & Clinical Directory"}</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#131b2e] tracking-tight mt-1">
-              {language === "bn" ? "চর্মরোগ বিশেষজ্ঞ ডাক্তার ও টেলিমেডিসিন" : "Accredited Dermatologist Network"}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#192531] tracking-tight mt-1 font-headline">
+              {language === "bn" ? "চর্মরোগ বিশেষজ্ঞের পরামর্শ নিন" : "Find an In-Person or Telehealth Doctor"}
             </h1>
-            <p className="text-sm text-slate-600 mt-1 max-w-2xl">
-              Connect with board-certified dermatologists. Transfer your SkinWise AI intake summary and optical metrics directly to expedite clinical evaluation.
+            <p className="text-sm text-[#4a5d6e] mt-1 max-w-2xl">
+              {language === "bn"
+                ? "অভিজ্ঞ চর্মরোগ বিশেষজ্ঞদের সাথে সরাসরি বা ভার্চুয়াল পরামর্শ নিন এবং আপনার সারসংক্ষেপ শেয়ার করুন।"
+                : "Connect with qualified clinicians for in-person examinations or virtual consultations."}
             </p>
           </div>
 
           {latestAssessment && (
-            <div className="bg-sky-50 border border-[#39b8fd]/50 rounded-xl p-3.5 flex items-center gap-3">
-              <span className="material-symbols-outlined text-[#006194] text-2xl">assignment_turned_in</span>
+            <div className="bg-[#eaf4f8] border border-[#cce4ee] rounded-2xl p-3.5 flex items-center gap-3">
+              <span className="material-symbols-outlined text-[#2b7f8f] text-2xl">assignment_turned_in</span>
               <div>
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ready to Attach</div>
-                <div className="text-xs font-bold text-slate-900">{latestAssessment.primary_condition} ({latestAssessment.anatomical_region})</div>
+                <div className="text-[10px] font-bold text-[#718292] uppercase tracking-wider">Ready to Attach</div>
+                <div className="text-xs font-bold text-[#192531]">{latestAssessment.primary_condition} ({latestAssessment.anatomical_region})</div>
               </div>
               <a
                 href={api.getPdfUrl(latestAssessment.id)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-2 text-xs font-bold text-[#006194] hover:underline"
+                className="ml-2 text-xs font-bold text-[#2b7f8f] hover:underline"
               >
                 Preview PDF
               </a>

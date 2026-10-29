@@ -3,12 +3,13 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { api, AssessmentSummary } from "@/lib/api";
 import { EmergencyModal } from "@/components/EmergencyModal";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"records" | "empty">("records");
+  const { t, language } = useLanguage();
   const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showEmergency, setShowEmergency] = useState(false);
@@ -25,583 +26,300 @@ export default function DashboardPage() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const patientName = user?.full_name || "Sarah Jenkins";
-  const patientId = user ? `#SW-${String(user.id).padStart(5, "0")}` : "#SW-94820";
+  const userName = user?.full_name ? user.full_name.split(" ")[0] : "there";
 
   return (
-    <>
-      <div className="max-w-7xl mx-auto px-gutter pb-space-xl space-y-space-lg w-full">
-        {/* Header Section: Patient Greeting & Clinical Badges */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-high">
-          <div className="space-y-1">
-            <div className="flex items-center gap-space-sm flex-wrap text-xs">
-              <span className="font-headline font-bold uppercase tracking-wider text-secondary">
-                Patient Portal • ID: {patientId}
-              </span>
-              <span className="h-1 w-1 rounded-full bg-outline-variant" />
-              <span className="text-on-surface-variant font-medium">
-                {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "short", day: "numeric" })}
-              </span>
+    <div className="min-h-screen bg-[#f0f8fb] text-slate-800 pb-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
+        
+        {/* Top Header Card */}
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-[#d1e5ec] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#2b7f8f] bg-[#eaf4f8] px-3 py-1 rounded-full">
+              <span className="material-symbols-outlined text-sm">health_and_safety</span>
+              <span>{language === "bn" ? "ব্যক্তিগত স্বাস্থ্য ড্যাশবোর্ড" : "Personal Health Portal"}</span>
             </div>
-            <h1 className="font-headline font-bold text-2xl sm:text-3xl text-on-surface tracking-tight">
-              Welcome back, {patientName.split(" ")[0]}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              {language === "bn" ? `স্বাগতম, ${userName}` : `Welcome back, ${userName}`}
             </h1>
-            <p className="text-xs text-on-surface-variant">
-              Your personal dermatological triage portal is synchronized with secure clinical storage.
+            <p className="text-sm sm:text-base text-slate-600 max-w-xl">
+              {language === "bn"
+                ? "আপনার ত্বকের নিরীক্ষণ রেকর্ড এবং সাধারণ ত্বকের যত্নের নির্দেশিকা এক নজরে দেখুন।"
+                : "Review your saved skin observations, general skincare guidance, and next steps."}
             </p>
           </div>
 
-          <div className="flex items-center flex-wrap gap-space-sm">
-            <div className="flex items-center gap-1.5 bg-surface-container-low px-3 py-1.5 rounded-full text-xs font-semibold text-on-surface">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <span>{assessments.length > 0 ? `${assessments.length} Active Records` : "2 Active Assessments"}</span>
-            </div>
-            <div className="flex items-center gap-1 bg-surface-container-low px-3 py-1.5 rounded-full text-xs text-on-surface-variant font-medium">
-              <span className="material-symbols-outlined text-tertiary text-base">lock</span>
-              <span>256-Bit Encrypted</span>
-            </div>
+          <div className="flex items-center flex-wrap gap-3">
+            <Link
+              href="/assess"
+              className="inline-flex items-center gap-2 bg-[#2b7f8f] hover:bg-[#236875] text-white px-5 py-3 rounded-2xl text-sm font-bold shadow-xs transition-colors"
+            >
+              <span className="material-symbols-outlined text-base">add_a_photo</span>
+              <span>{t.analyzeSkinBtn}</span>
+            </Link>
             <button
               onClick={() => setShowEmergency(true)}
-              className="flex items-center gap-1.5 bg-error text-on-error hover:opacity-95 px-3.5 py-1.5 rounded-full shadow-xs transition-opacity font-headline text-xs font-bold"
+              className="inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-3 rounded-2xl text-xs font-bold transition-colors"
             >
               <span className="material-symbols-outlined text-base">emergency</span>
-              <span>Emergency Triage Alert</span>
+              <span>{t.emergencyBtn}</span>
             </button>
           </div>
         </div>
 
-        {/* Advisory Clinical Notification & Boundary of Care */}
-        <div className="bg-surface-container-low p-space-md rounded-2xl border border-surface-container-high flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md">
-          <div className="flex items-start gap-space-md">
-            <div className="p-2 bg-primary-fixed rounded-xl text-on-primary-fixed mt-0.5 shrink-0">
-              <span className="material-symbols-outlined text-xl">medical_information</span>
+        {/* Medical Boundary Notice */}
+        <div className="bg-white p-5 rounded-2xl border border-[#d1e5ec] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#eaf4f8] text-[#2b7f8f] flex items-center justify-center shrink-0 mt-0.5">
+              <span className="material-symbols-outlined text-xl">info</span>
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h4 className="font-headline font-bold text-xs text-on-surface">
-                  Advisory Clinical Notification & Boundary of Care
-                </h4>
-                <span className="bg-secondary-fixed text-on-secondary-fixed-variant px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                  CE-MDR Class I
-                </span>
-              </div>
-              <p className="text-xs text-on-surface-variant max-w-4xl leading-relaxed">
-                SkinWise AI provides probabilistic visual triage screening for informational purposes only. It is not an automated medical diagnostic tool and cannot replace in-person histopathological verification or physical evaluation by a board-certified dermatologist.
+            <div>
+              <h4 className="text-sm font-bold text-slate-900">
+                {language === "bn" ? "অ-চিকিৎসাগত তথ্যমূলক বিজ্ঞপ্তি" : "Informational & Non-Diagnostic Notice"}
+              </h4>
+              <p className="text-xs sm:text-sm text-slate-600 mt-0.5 max-w-3xl leading-relaxed">
+                {language === "bn"
+                  ? "স্কিনওয়াইজ এআই কোনো রোগ নির্ণয় করে না। এটি শুধুমাত্র দৃশ্যমান প্যাটার্ন সম্পর্কিত তথ্য এবং সাধারণ যত্ন নির্দেশিকা প্রদান করে।"
+                  : "SkinWise AI does not diagnose medical conditions. It provides visual observations and general supportive guidance to help you prepare for a medical consultation."}
               </p>
             </div>
           </div>
           <Link
             href="/referral"
-            className="font-headline text-xs text-primary hover:text-secondary whitespace-nowrap self-end md:self-center font-bold"
+            className="text-xs sm:text-sm font-bold text-[#2b7f8f] hover:underline whitespace-nowrap self-end sm:self-center"
           >
-            Read Safety Charter →
+            {language === "bn" ? "তথ্য জানুন →" : "Read Full Policy →"}
           </Link>
         </div>
 
-        {/* Primary Action Hero Panel: Bento Grid (8 cols / 4 cols) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
-          {/* Start New Assessment (8 cols) */}
-          <div className="lg:col-span-8 bg-surface-container-lowest p-space-lg lg:p-space-xl rounded-2xl shadow-sm border border-surface-container-high flex flex-col justify-between space-y-space-md">
-            <div className="space-y-space-md">
-              <div className="flex items-center justify-between">
-                <span className="bg-primary-fixed text-on-primary-fixed-variant px-3 py-1 rounded-full font-headline text-xs font-bold uppercase tracking-wide">
-                  Step 1 of 4: Direct Camera Intake
-                </span>
-                <div className="flex items-center gap-1 text-xs text-on-surface-variant bg-surface-container-low px-3 py-1 rounded-full font-medium">
-                  <span className="material-symbols-outlined text-sm text-secondary">timer</span>
-                  <span>Avg completion: ~3 mins</span>
-                </div>
-              </div>
-
-              <div className="space-y-1 max-w-xl">
-                <h2 className="font-headline font-bold text-xl sm:text-2xl text-on-surface tracking-tight">
-                  Start New Dermatological Assessment
-                </h2>
-                <p className="text-body-sm text-on-surface-variant leading-relaxed">
-                  Upload high-resolution macro imagery of new or changing moles, rashes, or epidermal patches. Guided analysis processes morphology, asymmetry, and color distribution.
-                </p>
-              </div>
-
-              {/* Step Progression Workflow Pill Track */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                <div className="bg-surface-container-low p-2.5 rounded-xl flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-headline text-xs font-bold shrink-0">
-                    1
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-headline text-xs font-semibold text-on-surface truncate">Photo Capture</p>
-                    <p className="text-[10px] text-on-surface-variant truncate">Macro or dermatoscope</p>
-                  </div>
-                </div>
-                <div className="bg-surface-container-low p-2.5 rounded-xl flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center font-headline text-xs font-bold shrink-0">
-                    2
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-headline text-xs font-semibold text-on-surface truncate">Symptoms</p>
-                    <p className="text-[10px] text-on-surface-variant truncate">Duration & itching</p>
-                  </div>
-                </div>
-                <div className="bg-surface-container-low p-2.5 rounded-xl flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center font-headline text-xs font-bold shrink-0">
-                    3
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-headline text-xs font-semibold text-on-surface truncate">AI Triage</p>
-                    <p className="text-[10px] text-on-surface-variant truncate">Vision inference</p>
-                  </div>
-                </div>
-                <div className="bg-surface-container-low p-2.5 rounded-xl flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center font-headline text-xs font-bold shrink-0">
-                    4
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-headline text-xs font-semibold text-on-surface truncate">Clinical Plan</p>
-                    <p className="text-[10px] text-on-surface-variant truncate">Doctor export pack</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Bar */}
-            <div className="pt-space-md flex flex-col sm:flex-row items-stretch sm:items-center gap-space-md border-t border-surface-container-high/60">
-              <Link
-                href="/assess"
-                className="bg-primary hover:bg-secondary text-on-primary px-space-lg py-3 rounded-xl font-headline text-xs font-semibold flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
-              >
-                <span className="material-symbols-outlined text-lg">add_a_photo</span>
-                <span>Launch Image Intake</span>
-              </Link>
-              <Link
-                href="/assess"
-                className="bg-surface-container text-on-surface hover:bg-surface-container-high px-space-md py-3 rounded-xl font-headline text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <span className="material-symbols-outlined text-base">cloud_upload</span>
-                <span>Upload Dermoscopic File</span>
-              </Link>
-              <span className="text-[11px] text-on-surface-variant text-center sm:text-left">
-                Supports JPEG, PNG, HEIC • Up to 25MB
+        {/* Primary Action Hero Banner */}
+        <div className="bg-gradient-to-br from-[#2b7f8f] to-[#1e5863] rounded-3xl p-6 sm:p-8 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="space-y-3 max-w-xl">
+            <span className="bg-white/20 text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full inline-block">
+              {language === "bn" ? "দ্রুত ত্বক নিরীক্ষণ" : "Simple 3-Step Check"}
+            </span>
+            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
+              {language === "bn" ? "নতুন কোনো ত্বকের দাগ বা র্যাশ লক্ষ্য করেছেন?" : "Have a new or changing skin spot?"}
+            </h2>
+            <p className="text-sm text-white/90 leading-relaxed">
+              {language === "bn"
+                ? "একটি স্পষ্ট ছবি তুলুন, কয়েকটি সহজ প্রশ্নের উত্তর দিন এবং নিরাপদ ত্বকের যত্ন নির্দেশিকা পান।"
+                : "Take a clear photo, answer a few symptom questions, and receive supportive general care guidance and advice on when to see a doctor."}
+            </p>
+            <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-white/80">
+              <span className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">schedule</span>
+                Takes ~2 minutes
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">lock</span>
+                Private & confidential
               </span>
             </div>
           </div>
 
-          {/* Metric Radial Gauge (4 cols) */}
-          <div className="lg:col-span-4 bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-high flex flex-col justify-between space-y-space-md">
-            <div>
-              <div className="flex items-center justify-between pb-1">
-                <span className="font-headline text-[11px] uppercase tracking-wider font-bold text-on-surface-variant">
-                  Skin Health Index
-                </span>
-                <span className="material-symbols-outlined text-primary text-lg">ecg_heart</span>
-              </div>
-              <h3 className="font-headline font-bold text-lg text-on-surface">
-                Triage Stability Rating
-              </h3>
-              <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                Based on regular dermoscopy scans logged within the previous 90 days.
-              </p>
-            </div>
-
-            {/* Radial Dial SVG */}
-            <div className="flex items-center justify-center py-2">
-              <div className="relative w-36 h-36 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
-                  <circle
-                    className="text-surface-container-high"
-                    cx="60"
-                    cy="60"
-                    fill="transparent"
-                    r="50"
-                    stroke="currentColor"
-                    strokeWidth="10"
-                  />
-                  <circle
-                    className="text-primary"
-                    cx="60"
-                    cy="60"
-                    fill="transparent"
-                    r="50"
-                    stroke="currentColor"
-                    strokeDasharray="314.15"
-                    strokeDashoffset="65"
-                    strokeLinecap="round"
-                    strokeWidth="10"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="font-headline font-bold text-3xl text-primary leading-none">
-                    94%
-                  </span>
-                  <span className="font-headline text-[10px] text-on-surface-variant uppercase font-bold mt-1">
-                    Controlled
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-surface-container-low p-space-sm rounded-xl space-y-1.5 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-on-surface-variant">Lesions Tracked</span>
-                <span className="font-bold text-on-surface">3 Locations</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-on-surface-variant">Next Recurrence Check</span>
-                <span className="font-bold text-tertiary">In 12 Days</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Patient Lesion Records Section */}
-        <div className="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container-high space-y-space-md">
-          {/* Section Switcher Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-1 border-b border-surface-container-high/60">
-            <div>
-              <h2 className="font-headline font-bold text-lg text-on-surface">
-                Patient Lesion Records
-              </h2>
-              <p className="text-xs text-on-surface-variant">
-                Historical dermatological analysis, change metrics, and clinical escalation guidance.
-              </p>
-            </div>
-
-            {/* Toggle */}
-            <div className="flex items-center bg-surface-container-low p-1 rounded-xl">
-              <button
-                onClick={() => setActiveTab("records")}
-                className={`px-3 py-1.5 font-headline text-xs rounded-lg transition-all flex items-center gap-1.5 font-semibold ${
-                  activeTab === "records"
-                    ? "bg-surface-container-lowest text-primary shadow-xs"
-                    : "text-on-surface-variant hover:text-on-surface"
-                }`}
-              >
-                <span className="material-symbols-outlined text-sm">history</span>
-                <span>Recorded Assessments ({assessments.length || 2})</span>
-              </button>
-              <button
-                onClick={() => setActiveTab("empty")}
-                className={`px-3 py-1.5 font-headline text-xs rounded-lg transition-all flex items-center gap-1.5 font-semibold ${
-                  activeTab === "empty"
-                    ? "bg-surface-container-lowest text-primary shadow-xs"
-                    : "text-on-surface-variant hover:text-on-surface"
-                }`}
-              >
-                <span className="material-symbols-outlined text-sm">visibility_off</span>
-                <span>Empty State View</span>
-              </button>
-            </div>
-          </div>
-
-          {/* View A: Populated Assessment Records */}
-          {activeTab === "records" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter">
-              {/* Record 1 */}
-              <div className="bg-surface-container-low p-space-md rounded-2xl space-y-space-md flex flex-col justify-between border border-surface-container-high/60">
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-headline font-bold uppercase bg-surface-container-highest text-on-surface">
-                        <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-                        Monitored
-                      </span>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-headline font-bold uppercase bg-secondary-fixed text-on-secondary-fixed-variant">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                        Doctor Visit Advised
-                      </span>
-                    </div>
-                    <span className="text-xs text-on-surface-variant font-medium">Oct 18, 2025</span>
-                  </div>
-
-                  <div className="flex gap-space-md items-center">
-                    <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-amber-100 border border-amber-300/60 flex items-center justify-center">
-                      <div className="w-10 h-10 rounded-full bg-amber-900/70 blur-2xs" />
-                    </div>
-                    <div className="space-y-0.5 min-w-0">
-                      <h4 className="font-headline font-semibold text-sm text-on-surface truncate">
-                        Shoulder Pigmented Lesion
-                      </h4>
-                      <p className="text-xs text-on-surface-variant">Anatomical Region: Right Posterior Deltoid</p>
-                      <div className="flex items-center gap-2 text-xs pt-1">
-                        <span className="font-semibold text-primary">Confidence: 89.2%</span>
-                        <span>•</span>
-                        <span className="text-amber-700 font-semibold">Border Asymmetry: Detected</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-on-surface-variant bg-surface-container-lowest p-3 rounded-xl leading-relaxed">
-                    Visual AI detects slight boundary irregularity (ABCDE rule). Recommend booking dermoscopy exam with Dr. Patricia Evans or your primary dermatologist within 14 days.
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-surface-container-high/60">
-                  <span className="text-xs text-on-surface-variant flex items-center gap-1 font-medium">
-                    <span className="material-symbols-outlined text-sm text-tertiary">check_circle</span>
-                    Dermatologist Pack Ready
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href="/referral"
-                      className="bg-surface-container-lowest hover:bg-surface text-on-surface px-3 py-1.5 rounded-lg text-xs font-headline font-semibold border border-surface-container-high shadow-xs"
-                    >
-                      Export PDF
-                    </Link>
-                    <Link
-                      href={assessments[0] ? `/assessment/${assessments[0].id}` : "/assessment/1"}
-                      className="bg-primary hover:bg-secondary text-on-primary px-3.5 py-1.5 rounded-lg text-xs font-headline font-semibold shadow-xs flex items-center gap-1"
-                    >
-                      <span>View Full Report</span>
-                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-
-              {/* Record 2 */}
-              <div className="bg-surface-container-low p-space-md rounded-2xl space-y-space-md flex flex-col justify-between border border-surface-container-high/60">
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-headline font-bold uppercase bg-surface-container-highest text-on-surface">
-                        <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
-                        Resolved
-                      </span>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-headline font-bold uppercase bg-tertiary-fixed text-on-tertiary-fixed-variant">
-                        <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
-                        Mild / Benign Pattern
-                      </span>
-                    </div>
-                    <span className="text-xs text-on-surface-variant font-medium">Sep 29, 2025</span>
-                  </div>
-
-                  <div className="flex gap-space-md items-center">
-                    <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-red-100 border border-red-300/60 flex items-center justify-center">
-                      <div className="w-12 h-8 rounded-full bg-red-400/60 blur-xs" />
-                    </div>
-                    <div className="space-y-0.5 min-w-0">
-                      <h4 className="font-headline font-semibold text-sm text-on-surface truncate">
-                        Forearm Mild Rash (Contact Dermatitis)
-                      </h4>
-                      <p className="text-xs text-on-surface-variant">Anatomical Region: Left Volar Forearm</p>
-                      <div className="flex items-center gap-2 text-xs pt-1">
-                        <span className="font-semibold text-primary">Confidence: 94.6%</span>
-                        <span>•</span>
-                        <span className="text-tertiary font-semibold">Status: Erythema Cleared</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-on-surface-variant bg-surface-container-lowest p-3 rounded-xl leading-relaxed">
-                    Self-monitored episode. Follow-up photograph captured on Day 7 confirmed disappearance of contact dermatitis flare. Symptom diary entry logged as non-itchy.
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-surface-container-high/60">
-                  <span className="text-xs text-on-surface-variant flex items-center gap-1 font-medium">
-                    <span className="material-symbols-outlined text-sm text-tertiary">history_toggle_off</span>
-                    Archived Record
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href="/assess"
-                      className="bg-surface-container-lowest hover:bg-surface text-on-surface px-3 py-1.5 rounded-lg text-xs font-headline font-semibold border border-surface-container-high shadow-xs"
-                    >
-                      Log Re-flare
-                    </Link>
-                    <Link
-                      href={assessments[1] ? `/assessment/${assessments[1].id}` : "/assessment/2"}
-                      className="bg-primary hover:bg-secondary text-on-primary px-3.5 py-1.5 rounded-lg text-xs font-headline font-semibold shadow-xs flex items-center gap-1"
-                    >
-                      <span>View Full Report</span>
-                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* View B: Empty State Illustration */}
-          {activeTab === "empty" && (
-            <div className="bg-surface-container-low p-space-xl rounded-2xl text-center flex flex-col items-center justify-center space-y-space-md border border-dashed border-surface-container-highest">
-              <div className="w-20 h-20 rounded-full bg-primary-fixed flex items-center justify-center text-primary mb-1">
-                <span className="material-symbols-outlined text-4xl">photo_camera</span>
-              </div>
-              <div className="max-w-md space-y-1">
-                <h3 className="font-headline font-bold text-lg text-on-surface">
-                  No Dermatological Records Logged Yet
-                </h3>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  Start by capturing your first skin examination. Take a steady, well-lit photo of any lesion or patch you wish to inspect and track over time.
-                </p>
-              </div>
-
-              {/* Instructional Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-sm max-w-2xl text-left pt-2">
-                <div className="bg-surface-container-lowest p-space-sm rounded-xl space-y-1 border border-surface-container-high">
-                  <span className="material-symbols-outlined text-primary text-base">wb_sunny</span>
-                  <p className="font-headline font-semibold text-xs text-on-surface">Optimal Lighting</p>
-                  <p className="text-[11px] text-on-surface-variant leading-tight">Use natural indirect daylight without cast shadows.</p>
-                </div>
-                <div className="bg-surface-container-lowest p-space-sm rounded-xl space-y-1 border border-surface-container-high">
-                  <span className="material-symbols-outlined text-primary text-base">center_focus_strong</span>
-                  <p className="font-headline font-semibold text-xs text-on-surface">Sharp Distance</p>
-                  <p className="text-[11px] text-on-surface-variant leading-tight">Hold device 10–15 cm away to avoid blurry digital zoom.</p>
-                </div>
-                <div className="bg-surface-container-lowest p-space-sm rounded-xl space-y-1 border border-surface-container-high">
-                  <span className="material-symbols-outlined text-primary text-base">straighten</span>
-                  <p className="font-headline font-semibold text-xs text-on-surface">Scale Reference</p>
-                  <p className="text-[11px] text-on-surface-variant leading-tight">Keep lesion centered occupying ~40% of viewfinder.</p>
-                </div>
-              </div>
-
-              <Link
-                href="/assess"
-                className="bg-primary hover:bg-secondary text-on-primary px-space-lg py-2.5 rounded-xl font-headline text-xs font-semibold shadow-xs flex items-center gap-1.5 mt-2"
-              >
-                <span className="material-symbols-outlined text-base">photo_camera</span>
-                <span>Perform Initial Scan Now</span>
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Quick Navigation Deck: Core Subsystems (5 Cards Grid) */}
-        <div className="space-y-space-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="font-headline font-bold text-base text-on-surface">
-              Clinical Workspace & Modules
-            </h3>
-            <span className="text-xs text-on-surface-variant">Access telemetry and care pathways</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-md">
-            {/* 1. Skin Analysis */}
-            <Link
-              href="/assess"
-              className="bg-surface-container-lowest hover:bg-surface-container-low transition-all p-space-md rounded-2xl shadow-xs border border-surface-container-high flex flex-col justify-between group space-y-3"
-            >
-              <div className="space-y-2">
-                <div className="w-10 h-10 rounded-xl bg-primary-fixed text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-xl">biotech</span>
-                </div>
-                <h4 className="font-headline font-bold text-sm text-on-surface">Skin Analysis</h4>
-                <p className="text-xs text-on-surface-variant leading-tight">
-                  Algorithmic segmentation, border assessment, and ABCDE checks.
-                </p>
-              </div>
-              <div className="flex items-center justify-between text-xs text-primary font-headline font-bold">
-                <span>Scan Engine</span>
-                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
-              </div>
-            </Link>
-
-            {/* 2. Symptom Diary */}
-            <Link
-              href="/assess"
-              className="bg-surface-container-lowest hover:bg-surface-container-low transition-all p-space-md rounded-2xl shadow-xs border border-surface-container-high flex flex-col justify-between group space-y-3"
-            >
-              <div className="space-y-2">
-                <div className="w-10 h-10 rounded-xl bg-tertiary-fixed text-tertiary flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-xl">event_note</span>
-                </div>
-                <h4 className="font-headline font-bold text-sm text-on-surface">Symptom Diary</h4>
-                <p className="text-xs text-on-surface-variant leading-tight">
-                  Log itch severity (0-10), bleeding events, and medication responses.
-                </p>
-              </div>
-              <div className="flex items-center justify-between text-xs text-tertiary font-headline font-bold">
-                <span>Log Symptoms</span>
-                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
-              </div>
-            </Link>
-
-            {/* 3. Assessment History */}
-            <Link
-              href="/records"
-              className="bg-surface-container-lowest hover:bg-surface-container-low transition-all p-space-md rounded-2xl shadow-xs border border-surface-container-high flex flex-col justify-between group space-y-3"
-            >
-              <div className="space-y-2">
-                <div className="w-10 h-10 rounded-xl bg-secondary-fixed text-secondary flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-xl">stacked_bar_chart</span>
-                </div>
-                <h4 className="font-headline font-bold text-sm text-on-surface">Assessment History</h4>
-                <p className="text-xs text-on-surface-variant leading-tight">
-                  Comparative timelines and photographic diameter delta tracking.
-                </p>
-              </div>
-              <div className="flex items-center justify-between text-xs text-secondary font-headline font-bold">
-                <span>Full Chronology</span>
-                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
-              </div>
-            </Link>
-
-            {/* 4. Doctor Referral */}
-            <Link
-              href="/referral"
-              className="bg-surface-container-lowest hover:bg-surface-container-low transition-all p-space-md rounded-2xl shadow-xs border border-surface-container-high flex flex-col justify-between group space-y-3"
-            >
-              <div className="space-y-2">
-                <div className="w-10 h-10 rounded-xl bg-primary-fixed text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-xl">assignment_ind</span>
-                </div>
-                <h4 className="font-headline font-bold text-sm text-on-surface">Referral Summary</h4>
-                <p className="text-xs text-on-surface-variant leading-tight">
-                  Synthesized clinical briefs formatted for clinician consultation.
-                </p>
-              </div>
-              <div className="flex items-center justify-between text-xs text-primary font-headline font-bold">
-                <span>PDF Referral Pack</span>
-                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
-              </div>
-            </Link>
-
-            {/* 5. Privacy & Consent */}
-            <Link
-              href="/settings"
-              className="bg-surface-container-lowest hover:bg-surface-container-low transition-all p-space-md rounded-2xl shadow-xs border border-surface-container-high flex flex-col justify-between group space-y-3"
-            >
-              <div className="space-y-2">
-                <div className="w-10 h-10 rounded-xl bg-surface-container-highest text-on-surface flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-xl">shield</span>
-                </div>
-                <h4 className="font-headline font-bold text-sm text-on-surface">Privacy & Consent</h4>
-                <p className="text-xs text-on-surface-variant leading-tight">
-                  Manage biometric authorizations, HIPAA opt-ins, and data purges.
-                </p>
-              </div>
-              <div className="flex items-center justify-between text-xs text-on-surface font-headline font-bold">
-                <span>Fully Verified</span>
-                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
-              </div>
-            </Link>
-          </div>
-        </div>
-
-        {/* Telehealth Integration Banner */}
-        <div className="bg-gradient-to-r from-primary to-secondary p-space-lg rounded-2xl text-on-primary flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md shadow-sm">
-          <div className="space-y-1 max-w-2xl">
-            <span className="bg-white/20 text-on-primary px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-              Integrated Tele-Dermatology
-            </span>
-            <h3 className="font-headline font-bold text-lg text-white">
-              Connect with Board-Certified Dermatologists
-            </h3>
-            <p className="text-xs text-white/90 leading-relaxed">
-              Have your SkinWise AI scan reports reviewed remotely within 24 hours. Digital prescriptions and in-clinic referrals issued directly through your verified health network.
-            </p>
-          </div>
           <Link
-            href="/referral"
-            className="bg-surface-container-lowest text-primary hover:bg-surface transition-colors px-space-lg py-2.5 rounded-xl font-headline text-xs font-semibold shadow-sm shrink-0"
+            href="/assess"
+            className="bg-white hover:bg-[#f0f8fb] text-[#2b7f8f] px-6 py-3.5 rounded-2xl font-bold text-sm shadow-md transition-all shrink-0 self-start md:self-center flex items-center gap-2"
           >
-            Find Specialist Nearby
+            <span className="material-symbols-outlined text-base">photo_camera</span>
+            <span>{t.analyzeSkinBtn}</span>
           </Link>
         </div>
+
+        {/* Recent Assessments Section */}
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-[#d1e5ec] shadow-xs space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+                {language === "bn" ? "সাম্প্রতিক ত্বকের নিরীক্ষণ" : "Recent Skin Observations"}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                {language === "bn"
+                  ? "আপনার সাম্প্রতিক নিরীক্ষণ ও সংরক্ষিত নির্দেশিকা"
+                  : "Your recent checks, observed visible patterns, and care guidance."}
+              </p>
+            </div>
+            <Link
+              href="/records"
+              className="text-xs sm:text-sm font-bold text-[#2b7f8f] hover:underline"
+            >
+              {language === "bn" ? "সবগুলো দেখুন →" : "View All Records →"}
+            </Link>
+          </div>
+
+          {isLoading ? (
+            <div className="py-12 text-center text-slate-500">
+              <span className="material-symbols-outlined animate-spin text-3xl text-[#2b7f8f] mb-2">progress_activity</span>
+              <p className="text-sm">Loading your records...</p>
+            </div>
+          ) : assessments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {assessments.slice(0, 4).map((assessment) => (
+                <div
+                  key={assessment.id}
+                  className="bg-[#f0f8fb] p-5 rounded-2xl border border-[#d1e5ec] flex flex-col justify-between space-y-4 hover:border-[#2b7f8f] transition-all"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span className="font-semibold text-slate-700">Check #{assessment.id}</span>
+                      <span>{new Date(assessment.created_at).toLocaleDateString()}</span>
+                    </div>
+
+                    <div>
+                      <h4 className="text-base font-bold text-slate-900">
+                        {assessment.primary_condition || "Skin Pattern Observation"}
+                      </h4>
+                      <p className="text-xs sm:text-sm text-slate-600 mt-1 line-clamp-2">
+                        {assessment.anatomical_region ? `Location: ${assessment.anatomical_region}` : "General supportive care and routine monitoring recommended."}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-white text-slate-700 border border-slate-200">
+                        <span className="w-2 h-2 rounded-full bg-[#2b7f8f]" />
+                        {assessment.triage_title || "General Care"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-200 text-xs">
+                    <Link
+                      href={`/assessment/${assessment.id}`}
+                      className="font-bold text-[#2b7f8f] hover:underline flex items-center gap-1"
+                    >
+                      <span>View Full Assessment</span>
+                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </Link>
+                    <Link
+                      href="/referral"
+                      className="text-slate-500 hover:text-slate-800 font-medium"
+                    >
+                      Print Summary
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Empty State */
+            <div className="text-center py-10 px-4 bg-[#f0f8fb] rounded-2xl border border-dashed border-[#d1e5ec] space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-white text-[#2b7f8f] flex items-center justify-center mx-auto shadow-xs">
+                <span className="material-symbols-outlined text-3xl">photo_camera</span>
+              </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <h3 className="text-base font-bold text-slate-900">
+                  {language === "bn" ? "এখনও কোনো ত্বকের রেকর্ড নেই" : "No Skin Checks Recorded Yet"}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  {language === "bn"
+                    ? "আপনার প্রথম নিরীক্ষণ শুরু করুন। একটি ভালো আলোয় তোলা ছবি ব্যবহার করুন।"
+                    : "Start your first skin observation. Take a clear, in-focus photograph of any skin concern you wish to inspect."}
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <Link
+                  href="/assess"
+                  className="inline-flex items-center gap-2 bg-[#2b7f8f] hover:bg-[#236875] text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-colors"
+                >
+                  <span className="material-symbols-outlined text-base">add_a_photo</span>
+                  <span>{t.analyzeSkinBtn}</span>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Quick Navigation Cards */}
+        <div className="space-y-4">
+          <h3 className="text-base font-bold text-slate-900">
+            {language === "bn" ? "গুরুত্বপূর্ণ লিংকসমূহ" : "Quick Navigation"}
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link
+              href="/assess"
+              className="bg-white p-5 rounded-2xl border border-[#d1e5ec] shadow-xs hover:border-[#2b7f8f] transition-all flex flex-col justify-between group space-y-3"
+            >
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-xl bg-[#eaf4f8] text-[#2b7f8f] flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-xl">biotech</span>
+                </div>
+                <h4 className="font-bold text-sm text-slate-900">Analyze Skin Concern</h4>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  Upload a photo and answer symptom questions for guidance.
+                </p>
+              </div>
+              <div className="flex items-center justify-between text-xs text-[#2b7f8f] font-bold pt-2">
+                <span>Start Check</span>
+                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+              </div>
+            </Link>
+
+            <Link
+              href="/records"
+              className="bg-white p-5 rounded-2xl border border-[#d1e5ec] shadow-xs hover:border-[#2b7f8f] transition-all flex flex-col justify-between group space-y-3"
+            >
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-xl bg-[#eaf4f8] text-[#2b7f8f] flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-xl">history</span>
+                </div>
+                <h4 className="font-bold text-sm text-slate-900">History & Timeline</h4>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  Review all your past checks and compare visible changes over time.
+                </p>
+              </div>
+              <div className="flex items-center justify-between text-xs text-[#2b7f8f] font-bold pt-2">
+                <span>View History</span>
+                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+              </div>
+            </Link>
+
+            <Link
+              href="/referral"
+              className="bg-white p-5 rounded-2xl border border-[#d1e5ec] shadow-xs hover:border-[#2b7f8f] transition-all flex flex-col justify-between group space-y-3"
+            >
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-xl bg-[#eaf4f8] text-[#2b7f8f] flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-xl">assignment</span>
+                </div>
+                <h4 className="font-bold text-sm text-slate-900">Doctor Discussion Guide</h4>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  Export structured notes to share with your healthcare provider.
+                </p>
+              </div>
+              <div className="flex items-center justify-between text-xs text-[#2b7f8f] font-bold pt-2">
+                <span>Doctor Guide</span>
+                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+              </div>
+            </Link>
+
+            <Link
+              href="/settings"
+              className="bg-white p-5 rounded-2xl border border-[#d1e5ec] shadow-xs hover:border-[#2b7f8f] transition-all flex flex-col justify-between group space-y-3"
+            >
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-xl bg-[#eaf4f8] text-[#2b7f8f] flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-xl">shield</span>
+                </div>
+                <h4 className="font-bold text-sm text-slate-900">Privacy & Settings</h4>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  Control photo retention, data scrubbing, and download your data.
+                </p>
+              </div>
+              <div className="flex items-center justify-between text-xs text-[#2b7f8f] font-bold pt-2">
+                <span>Manage Privacy</span>
+                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+              </div>
+            </Link>
+          </div>
+        </div>
+
       </div>
 
       <EmergencyModal isOpen={showEmergency} onClose={() => setShowEmergency(false)} />
-    </>
+    </div>
   );
 }
-

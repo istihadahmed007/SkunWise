@@ -3,11 +3,13 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { api } from "@/lib/api";
 
 export default function AuthPage() {
   const router = useRouter();
   const { login } = useAuth();
+  const { language } = useLanguage();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +27,7 @@ export default function AuthPage() {
     try {
       if (isRegister) {
         if (!consentBiometric || !consentDisclaimer) {
-          setError("You must acknowledge both clinical biometric and non-diagnostic disclaimers to proceed.");
+          setError("Please agree to the photo privacy and non-diagnostic notices to create an account.");
           setIsLoading(false);
           return;
         }
@@ -33,7 +35,7 @@ export default function AuthPage() {
         const res = await api.register({
           email,
           password,
-          full_name: fullName || "Patient User",
+          full_name: fullName || "User",
           consent_biometric: consentBiometric,
           consent_disclaimer: consentDisclaimer,
         });
@@ -75,35 +77,37 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-gutter py-space-xl">
-      <div className="bg-surface-container-lowest p-space-lg sm:p-space-xl rounded-3xl shadow-xl border border-surface-container-high space-y-space-md">
+    <div className="min-h-screen bg-[#f0f8fb] flex items-center justify-center px-4 py-12">
+      <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-[#d1e5ec] max-w-md w-full space-y-6">
         {/* Header */}
-        <div className="text-center space-y-1">
-          <div className="w-12 h-12 rounded-2xl bg-[#4da8b9] text-white mx-auto flex items-center justify-center font-bold text-xl shadow-xs mb-2">
-            <span className="material-symbols-outlined text-2xl">dermatology</span>
+        <div className="text-center space-y-2">
+          <div className="w-12 h-12 rounded-2xl bg-[#eaf4f8] text-[#2b7f8f] mx-auto flex items-center justify-center font-bold text-xl shadow-xs">
+            <span className="material-symbols-outlined text-2xl">health_and_safety</span>
           </div>
-          <h1 className="font-headline font-bold text-2xl text-on-surface">
-            {isRegister ? "Create Clinical Account" : "Sign In to SkinWise"}
-          </h1>
-          <p className="text-xs text-on-surface-variant">
+          <h1 className="font-extrabold text-2xl text-slate-900">
             {isRegister
-              ? "Enroll for private, encrypted dermatological triage"
-              : "Access your lesion assessments and doctor referrals"}
+              ? language === "bn" ? "অ্যাকাউন্ট তৈরি করুন" : "Create Account"
+              : language === "bn" ? "সাইন ইন করুন" : "Sign In to SkinWise"}
+          </h1>
+          <p className="text-sm text-slate-600">
+            {isRegister
+              ? "Track your skin observations and save personalized skincare guidance"
+              : "Access your saved skin checks and doctor discussion summaries"}
           </p>
         </div>
 
         {/* Tab switch */}
-        <div className="flex bg-surface-container-low p-1 rounded-xl">
+        <div className="flex bg-[#f0f8fb] p-1 rounded-xl border border-slate-200">
           <button
             type="button"
             onClick={() => {
               setIsRegister(false);
               setError(null);
             }}
-            className={`flex-1 py-2 rounded-lg font-headline text-xs font-semibold transition-all ${
+            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
               !isRegister
-                ? "bg-surface-container-lowest text-primary shadow-xs"
-                : "text-on-surface-variant hover:text-on-surface"
+                ? "bg-white text-[#2b7f8f] shadow-xs"
+                : "text-slate-500 hover:text-slate-900"
             }`}
           >
             Sign In
@@ -114,10 +118,10 @@ export default function AuthPage() {
               setIsRegister(true);
               setError(null);
             }}
-            className={`flex-1 py-2 rounded-lg font-headline text-xs font-semibold transition-all ${
+            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
               isRegister
-                ? "bg-surface-container-lowest text-primary shadow-xs"
-                : "text-on-surface-variant hover:text-on-surface"
+                ? "bg-white text-[#2b7f8f] shadow-xs"
+                : "text-slate-500 hover:text-slate-900"
             }`}
           >
             Register
@@ -126,8 +130,8 @@ export default function AuthPage() {
 
         {/* Error notification */}
         {error && (
-          <div className="bg-error-container/40 border border-error/30 text-on-error-container p-3 rounded-xl text-xs flex items-start gap-2">
-            <span className="material-symbols-outlined text-base text-error mt-0.5 shrink-0">
+          <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-xl text-xs sm:text-sm flex items-start gap-2">
+            <span className="material-symbols-outlined text-base text-rose-600 mt-0.5 shrink-0">
               error
             </span>
             <span>{error}</span>
@@ -135,10 +139,10 @@ export default function AuthPage() {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-space-md">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {isRegister && (
             <div>
-              <label className="block text-xs font-headline font-semibold text-on-surface mb-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
                 Full Name
               </label>
               <input
@@ -146,14 +150,14 @@ export default function AuthPage() {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Dr. / Patient Name"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-surface-container-highest bg-surface-container-lowest text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                placeholder="Sarah Jenkins"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#2b7f8f] focus:border-[#2b7f8f]"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-headline font-semibold text-on-surface mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
               Email Address
             </label>
             <input
@@ -161,13 +165,13 @@ export default function AuthPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="patient@example.com"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-surface-container-highest bg-surface-container-lowest text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+              placeholder="user@example.com"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#2b7f8f] focus:border-[#2b7f8f]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-headline font-semibold text-on-surface mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
               Password
             </label>
             <input
@@ -176,34 +180,34 @@ export default function AuthPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••••••"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-surface-container-highest bg-surface-container-lowest text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#2b7f8f] focus:border-[#2b7f8f]"
             />
           </div>
 
           {/* Registration Disclaimers */}
           {isRegister && (
-            <div className="space-y-3 pt-1 border-t border-surface-container-high">
-              <label className="flex items-start gap-2 cursor-pointer text-xs text-on-surface-variant">
+            <div className="space-y-3 pt-2 border-t border-slate-100">
+              <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-600 leading-relaxed">
                 <input
                   type="checkbox"
                   checked={consentBiometric}
                   onChange={(e) => setConsentBiometric(e.target.checked)}
-                  className="mt-0.5 rounded border-surface-container-highest text-primary focus:ring-primary"
+                  className="mt-0.5 rounded border-slate-300 text-[#2b7f8f] focus:ring-[#2b7f8f]"
                 />
                 <span>
-                  <strong className="text-on-surface">Biometric Intake Consent:</strong> I authorize client-side anonymization and optical vision processing of my skin photography.
+                  <strong className="text-slate-800">Photo Processing Consent:</strong> I agree to allow SkinWise AI to process uploaded skin images to extract visible characteristics.
                 </span>
               </label>
 
-              <label className="flex items-start gap-2 cursor-pointer text-xs text-on-surface-variant">
+              <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-600 leading-relaxed">
                 <input
                   type="checkbox"
                   checked={consentDisclaimer}
                   onChange={(e) => setConsentDisclaimer(e.target.checked)}
-                  className="mt-0.5 rounded border-surface-container-highest text-primary focus:ring-primary"
+                  className="mt-0.5 rounded border-slate-300 text-[#2b7f8f] focus:ring-[#2b7f8f]"
                 />
                 <span>
-                  <strong className="text-on-surface">SaMD CE Class I Boundary:</strong> I understand SkinWise AI provides pre-consultation decision support, not an automated definitive diagnosis.
+                  <strong className="text-slate-800">Non-Diagnostic Notice:</strong> I understand SkinWise AI provides informational guidance only and is not a medical diagnosis.
                 </span>
               </label>
             </div>
@@ -212,32 +216,31 @@ export default function AuthPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 rounded-xl bg-primary hover:bg-secondary text-on-primary font-headline text-xs font-semibold shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full py-3 rounded-xl bg-[#2b7f8f] hover:bg-[#236875] text-white text-sm font-bold shadow-xs transition-all flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {isLoading ? (
               <>
                 <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                <span>Authenticating...</span>
+                <span>Connecting...</span>
               </>
             ) : (
-              <span>{isRegister ? "Agree & Create Account" : "Sign In to Portal"}</span>
+              <span>{isRegister ? "Agree & Create Account" : "Sign In"}</span>
             )}
           </button>
         </form>
 
-        {/* Demo Credentials Auto-Fill Pill */}
+        {/* Demo Credentials Auto-Fill */}
         <div className="pt-2 text-center">
           <button
             type="button"
             onClick={handleDemoFill}
-            className="text-[11px] text-primary hover:underline font-medium inline-flex items-center gap-1"
+            className="text-xs text-[#2b7f8f] hover:underline font-semibold inline-flex items-center gap-1"
           >
-            <span className="material-symbols-outlined text-xs">key</span>
-            <span>Auto-fill Demo Patient Account (Sarah Jenkins)</span>
+            <span className="material-symbols-outlined text-sm">key</span>
+            <span>Use Demo Account (Sarah Jenkins)</span>
           </button>
         </div>
       </div>
     </div>
   );
 }
-

@@ -37,6 +37,8 @@ export default function AssessPage() {
   const [hasBleedingOrOozing, setHasBleedingOrOozing] = useState<boolean>(false);
   const [hasNewExposure, setHasNewExposure] = useState<boolean>(false);
   const [exposureDetails, setExposureDetails] = useState<string>("");
+  const [middaySkinFeel, setMiddaySkinFeel] = useState<string>("balanced");
+  const [skinSensitivity, setSkinSensitivity] = useState<string>("rarely_reacts");
 
   // Safety red flags
   const [hasFever, setHasFever] = useState<boolean>(false);
@@ -211,6 +213,8 @@ export default function AssessPage() {
       prior_chemical_exposure: hasNewExposure,
       exposure_details: exposureDetails.trim() || undefined,
       personal_skin_history: undefined,
+      midday_skin_feel: middaySkinFeel,
+      skin_sensitivity: skinSensitivity,
       has_fever_or_chills: hasFever,
       has_facial_or_throat_swelling: hasSwelling,
       has_breathing_difficulty: hasBreathingTrouble,
@@ -758,7 +762,80 @@ export default function AssessPage() {
               )}
             </div>
 
-            {/* 6. URGENT SAFETY CHECKLIST */}
+            {/* 6. Cosmetic Skin Type (Midday Feel & Sensitivity) */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <div>
+                <h3 className="font-headline font-bold text-sm text-[#1c2834]">
+                  {language === "bn" ? "কসমেটিক ত্বকের অনুভূতি ও ধরন" : "Cosmetic Skin Characteristics (Self-Report)"}
+                </h3>
+                <p className="text-xs text-[#526373]">
+                  {language === "bn"
+                    ? "এই প্রশ্নগুলো ত্বকের স্বাভাবিক তেল ও আর্দ্রতার মাত্রা বুঝে সঠিক প্রসাধন উপাদান পরামর্শ দিতে সাহায্য করে।"
+                    : "Helps classify cosmetic characteristics (oiliness, dryness) to recommend gentle, suitable skincare."}
+                </p>
+              </div>
+
+              {/* Midday feel */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-[#1c2834]">
+                  {language === "bn" ? "দুপুরের দিকে আপনার মুখের ত্বক কেমন অনুভূত হয়?" : "How does your facial skin typically feel by midday?"}
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: "balanced", label: language === "bn" ? "স্বাভাবিক / আরামদায়ক" : "Balanced" },
+                    { id: "oily", label: language === "bn" ? "তৈলাক্ত / চকচকে" : "Oily / Shiny" },
+                    { id: "dry", label: language === "bn" ? "শুষ্ক / টানটান" : "Dry / Tight" },
+                    { id: "combination", label: language === "bn" ? "মিশ্র (টি-জোন তৈলাক্ত)" : "Combination" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setMiddaySkinFeel(item.id)}
+                      className={`py-2 px-3 rounded-xl font-headline text-xs font-bold transition-all cursor-pointer ${
+                        middaySkinFeel === item.id
+                          ? "bg-[#2b7f8f] text-white shadow-xs"
+                          : "bg-[#f4fafc] hover:bg-[#e8f4f8] text-[#1c2834]"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Reactivity */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-[#1c2834]">
+                  {language === "bn" ? "আপনার ত্বক কি নতুন পণ্য ব্যবহারে সহজে লালচে হয় বা জ্বালাপোড়া করে?" : "Does your skin easily sting, redden, or react to new products?"}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSkinSensitivity("rarely_reacts")}
+                    className={`py-2 px-3 rounded-xl font-headline text-xs font-bold transition-all cursor-pointer ${
+                      skinSensitivity === "rarely_reacts"
+                        ? "bg-[#2b7f8f] text-white shadow-xs"
+                        : "bg-[#f4fafc] hover:bg-[#e8f4f8] text-[#1c2834]"
+                    }`}
+                  >
+                    {language === "bn" ? "না, সহজে রিঅ্যাক্ট করে না (Resilient)" : "Rarely reacts (Resilient)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSkinSensitivity("easily_irritated")}
+                    className={`py-2 px-3 rounded-xl font-headline text-xs font-bold transition-all cursor-pointer ${
+                      skinSensitivity === "easily_irritated"
+                        ? "bg-[#2b7f8f] text-white shadow-xs"
+                        : "bg-[#f4fafc] hover:bg-[#e8f4f8] text-[#1c2834]"
+                    }`}
+                  >
+                    {language === "bn" ? "হ্যাঁ, সহজে সংবেদনশীল হয় (Sensitive)" : "Yes, easily irritated (Sensitive)"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 7. URGENT SAFETY CHECKLIST */}
             <div className="p-5 rounded-3xl bg-rose-50/70 border border-rose-200/80 space-y-3">
               <div className="flex items-center gap-2 text-[#ba1a1a]">
                 <span className="material-symbols-outlined text-xl">warning</span>

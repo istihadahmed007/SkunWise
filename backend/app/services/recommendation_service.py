@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional
 from app.models.schemas import (
-    SymptomQuestionnaireInput, ConditionMatchModel, TriageResultModel
+    SymptomQuestionnaireInput, ConditionMatchModel, TriageResultModel,
+    CosmeticSkinTypeModel, BoundingBoxModel, DetectedAreaModel, SkincareProductOptionModel
 )
 from app.services.vision_engine import SUPPORTED_CONDITIONS
 
@@ -273,6 +274,108 @@ class RecommendationEngine:
         return matches
 
     @classmethod
+    def evaluate_cosmetic_skin_type(
+        cls,
+        symptoms: SymptomQuestionnaireInput,
+        visual_findings: Optional[Dict[str, Any]] = None
+    ) -> CosmeticSkinTypeModel:
+        feel = getattr(symptoms, "midday_skin_feel", "balanced") or "balanced"
+        sensitivity = getattr(symptoms, "skin_sensitivity", "rarely_reacts") or "rarely_reacts"
+        
+        if sensitivity == "easily_irritated":
+            return CosmeticSkinTypeModel(
+                skin_type="Sensitive Skin",
+                explanation="Reported tendency for skin to sting, flush, or react easily to new products or weather changes. Prioritize simple, fragrance-free formulations.",
+                source="Questionnaire self-report & barrier context"
+            )
+        elif feel == "oily":
+            return CosmeticSkinTypeModel(
+                skin_type="Oily Skin",
+                explanation="Reported excess sebum production across the face by midday. Lightweight, non-comedogenic gel or fluid moisturizers are typically preferred.",
+                source="Questionnaire self-report & cosmetic observation"
+            )
+        elif feel == "dry":
+            return CosmeticSkinTypeModel(
+                skin_type="Dry Skin",
+                explanation="Reported tightness, dry feel, or flaking. Rich cream moisturizers with ceramides or glycerin support barrier hydration.",
+                source="Questionnaire self-report & cosmetic observation"
+            )
+        elif feel == "combination":
+            return CosmeticSkinTypeModel(
+                skin_type="Combination Skin",
+                explanation="Reported oily T-zone (forehead, nose) with balanced or dry cheeks. Balanced hydration with light layering works best.",
+                source="Questionnaire self-report & cosmetic observation"
+            )
+        else:
+            return CosmeticSkinTypeModel(
+                skin_type="Normal / Balanced Skin",
+                explanation="Reported comfortable oil and hydration balance throughout the day. Basic gentle cleansing and broad-spectrum sun protection help maintain this state.",
+                source="Questionnaire self-report & cosmetic observation"
+            )
+
+    @classmethod
+    def generate_skincare_options(
+        cls,
+        cosmetic_type: CosmeticSkinTypeModel,
+        primary_condition_key: str
+    ) -> List[SkincareProductOptionModel]:
+        # Always return a maximum of 3 practical, conservative product options
+        if cosmetic_type.skin_type == "Oily Skin" or primary_condition_key == "acne_vulgaris":
+            return [
+                SkincareProductOptionModel(
+                    category="Gentle Foaming or Gel Cleanser",
+                    role="Removes excess surface sebum and impurities without stripping natural moisture.",
+                    how_to_use="Wash twice daily with lukewarm water. Pat dry gently with a clean towel; avoid harsh scrubbing."
+                ),
+                SkincareProductOptionModel(
+                    category="Oil-Free, Non-Comedogenic Moisturizer",
+                    role="Provides lightweight hydration without clogging pores or feeling heavy.",
+                    how_to_use="Apply a pea-sized amount morning and evening. Patch test on inner arm for 24 hours before first use; stop if irritation develops."
+                ),
+                SkincareProductOptionModel(
+                    category="Broad-Spectrum Fluid Sunscreen (SPF 30+)",
+                    role="Protects from UV radiation and helps prevent post-inflammatory dark marks.",
+                    how_to_use="Apply liberally each morning as the final step. Reapply every 2 hours if outdoors."
+                )
+            ]
+        elif cosmetic_type.skin_type in ("Dry Skin", "Sensitive Skin") or primary_condition_key in ("eczema_contact_dermatitis", "psoriasis"):
+            return [
+                SkincareProductOptionModel(
+                    category="Hydrating Cream Cleanser",
+                    role="Cleanses gently while maintaining the skin's natural protective lipid barrier.",
+                    how_to_use="Massage over damp skin with lukewarm water once or twice daily; rinse thoroughly and pat dry."
+                ),
+                SkincareProductOptionModel(
+                    category="Fragrance-Free Barrier Cream or Ointment",
+                    role="Deeply moisturizes with ceramides or glycerin to seal in moisture and soothe dryness.",
+                    how_to_use="Apply within 3 minutes of washing to trap hydration. Discontinue immediately if stinging occurs."
+                ),
+                SkincareProductOptionModel(
+                    category="Gentle Mineral Sunscreen (SPF 30+)",
+                    role="Defends against UV damage with zinc oxide or titanium dioxide suited for easily irritated skin.",
+                    how_to_use="Apply every morning before stepping outside. Patch test a small spot before regular use."
+                )
+            ]
+        else:
+            return [
+                SkincareProductOptionModel(
+                    category="Gentle Daily Cleanser",
+                    role="Clears daily buildup, sweat, and sunscreen gently without drying.",
+                    how_to_use="Use morning and night with lukewarm water. Avoid hot water, which strips natural oils."
+                ),
+                SkincareProductOptionModel(
+                    category="Fragrance-Free Daily Moisturizer",
+                    role="Maintains optimal hydration balance and skin barrier smoothness.",
+                    how_to_use="Smooth gently over skin after cleansing. Patch test on a small area for 24 hours first."
+                ),
+                SkincareProductOptionModel(
+                    category="Broad-Spectrum Sunscreen (SPF 30+)",
+                    role="Shields skin from UV rays to prevent sunburn, premature aging, and pigmentation.",
+                    how_to_use="Apply evenly in the morning as your final skincare step."
+                )
+            ]
+
+    @classmethod
     def generate_clinical_assessment(
         cls,
         symptoms: SymptomQuestionnaireInput,
@@ -305,6 +408,53 @@ class RecommendationEngine:
 
         primary_kb = CLINICAL_KNOWLEDGE_BASE.get(primary_match_key, CLINICAL_KNOWLEDGE_BASE["eczema_contact_dermatitis"])
 
+        # 1. Cosmetic Skin Type (Cleanly separated from disease analysis)
+        cosmetic_skin_type = cls.evaluate_cosmetic_skin_type(symptoms, visual_findings)
+
+        # 2. Detected Area Localization (Genuine from model when supported, else None)
+        detected_area_raw = visual_findings.get("detected_area", {})
+        bbox_data = detected_area_raw.get("bounding_box")
+        bbox_model = BoundingBoxModel(**bbox_data) if (bbox_data and isinstance(bbox_data, dict)) else None
+
+        detected_area = DetectedAreaModel(
+            has_detection=bool(detected_area_raw.get("has_detection", False) and bbox_model),
+            bounding_box=bbox_model,
+            label=detected_area_raw.get("label"),
+            is_supported=detected_area_raw.get("is_supported", False),
+            notes=detected_area_raw.get("notes", "Localization overlay is not available for this image.")
+        )
+
+        # 3. Recommended Skincare Options (Max 3)
+        recommended_skincare = cls.generate_skincare_options(cosmetic_skin_type, primary_match_key)
+
+        # 4. Care Level
+        if triage_pathway["triage_tier"] == 3:
+            care_level = "Seek urgent medical care"
+        elif triage_pathway["triage_tier"] == 2:
+            care_level = "Arrange a doctor visit"
+        else:
+            care_level = "General self-care"
+
+        # 5. Practical Care Tips (Max 3)
+        if triage_pathway["triage_tier"] == 3:
+            practical_care_tips = [
+                "Seek emergency medical evaluation immediately; do not rely on home care.",
+                "Rest comfortably and avoid applying any new products or taking unprescribed medication.",
+                "Take note of when symptoms started and bring any suspected trigger packages to the clinic."
+            ]
+        elif triage_pathway["triage_tier"] == 2:
+            practical_care_tips = [
+                "Arrange an in-person appointment with a doctor or dermatologist for a physical exam.",
+                "Keep a brief log of whether the spot changes in size, shape, color, or discomfort over the coming days.",
+                "Avoid harsh scrubs, acids, or unprescribed medicated creams prior to your medical visit."
+            ]
+        else:
+            practical_care_tips = [
+                "Wash the area gently with lukewarm water and a mild, fragrance-free cleanser.",
+                "Apply a plain, fragrance-free moisturizer twice daily to support your skin barrier.",
+                "Monitor the skin for 1 to 2 weeks; schedule a doctor check if redness, spreading, or discomfort worsens."
+            ]
+
         citations = []
         for cond in possible_conditions:
             kb = CLINICAL_KNOWLEDGE_BASE.get(cond.condition_id)
@@ -333,7 +483,14 @@ class RecommendationEngine:
             what_to_avoid=primary_kb.get("what_to_avoid", []),
             critical_warning_signs=primary_kb.get("critical_warning_signs", []),
             diagnostic_gaps=diagnostic_gaps,
-            citations=citations
+            citations=citations,
+            main_finding=f"Possible visible concern: {possible_conditions[0].name}" if possible_conditions else "Visible skin observation",
+            confidence_statement=uncertainty.get("uncertainty_rationale", "Automated visual pattern match. Medical evaluation required for clinical diagnosis."),
+            cosmetic_skin_type=cosmetic_skin_type,
+            detected_area=detected_area,
+            recommended_skincare=recommended_skincare,
+            care_level=care_level,
+            practical_care_tips=practical_care_tips
         )
 
 recommendation_engine = RecommendationEngine()

@@ -68,6 +68,33 @@ export interface ConditionMatch {
   source_url: string;
 }
 
+export interface BoundingBox {
+  ymin: number;
+  xmin: number;
+  ymax: number;
+  xmax: number;
+}
+
+export interface DetectedArea {
+  has_detection: boolean;
+  bounding_box?: BoundingBox | null;
+  label?: string | null;
+  is_supported: boolean;
+  notes: string;
+}
+
+export interface CosmeticSkinType {
+  skin_type: string;
+  explanation: string;
+  source: string;
+}
+
+export interface SkincareProductOption {
+  category: string;
+  role: string;
+  how_to_use: string;
+}
+
 export interface TriageResult {
   triage_tier: number;
   triage_name: string;
@@ -91,6 +118,13 @@ export interface TriageResult {
     last_reviewed: string;
     status: string;
   }>;
+  main_finding?: string;
+  confidence_statement?: string;
+  cosmetic_skin_type?: CosmeticSkinType;
+  detected_area?: DetectedArea;
+  recommended_skincare?: SkincareProductOption[];
+  care_level?: string;
+  practical_care_tips?: string[];
 }
 
 export interface Assessment {
@@ -130,6 +164,8 @@ export interface SymptomInput {
   prior_chemical_exposure: boolean;
   exposure_details?: string;
   personal_skin_history?: string;
+  midday_skin_feel?: string;
+  skin_sensitivity?: string;
   has_fever_or_chills: boolean;
   has_facial_or_throat_swelling: boolean;
   has_breathing_difficulty: boolean;

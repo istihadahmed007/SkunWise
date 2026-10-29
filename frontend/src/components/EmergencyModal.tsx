@@ -14,34 +14,34 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-inverse-surface/60 backdrop-blur-sm flex items-center justify-center p-gutter animate-fade-in">
-      <div className="bg-surface-container-lowest max-w-lg w-full p-space-lg rounded-2xl shadow-2xl space-y-space-md border border-error-container">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white max-w-lg w-full p-6 sm:p-8 rounded-3xl shadow-xl space-y-5 border border-rose-200">
         {/* Header */}
-        <div className="flex items-center justify-between pb-space-xs border-b border-surface-container-high">
-          <div className="flex items-center gap-space-sm text-error">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5 text-rose-600">
             <span className="material-symbols-outlined text-3xl">warning</span>
-            <h3 className="font-headline font-semibold text-headline-sm text-error">
+            <h3 className="font-extrabold text-xl text-rose-700">
               {t.emergencyTitle}
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg hover:bg-surface-container transition-colors"
+            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <span className="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
 
         {/* Advisory */}
-        <p className="text-body-sm text-on-surface-variant leading-relaxed">
+        <p className="text-sm text-slate-700 leading-relaxed">
           {t.emergencyDesc}
         </p>
 
         {/* Bullet checklist */}
-        <ul className="space-y-space-xs text-body-sm text-on-surface bg-error-container/20 p-space-md rounded-xl border border-error/20">
+        <ul className="space-y-2.5 text-sm text-slate-800 bg-rose-50/70 p-4 rounded-2xl border border-rose-200">
           {t.emergencyList.map((item, idx) => (
-            <li key={idx} className="flex items-start gap-2">
-              <span className="material-symbols-outlined text-base text-error mt-0.5 shrink-0">
+            <li key={idx} className="flex items-start gap-2.5">
+              <span className="material-symbols-outlined text-base text-rose-600 mt-0.5 shrink-0">
                 crisis_alert
               </span>
               <span>{item}</span>
@@ -50,28 +50,28 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
         </ul>
 
         {/* Emergency Call Numbers */}
-        <div className="space-y-space-xs">
-          <div className="font-headline text-label-sm uppercase tracking-wider text-on-surface-variant font-semibold">
-            Emergency Dispatch Contacts:
+        <div className="space-y-2">
+          <div className="text-xs uppercase tracking-wider text-slate-500 font-bold">
+            Emergency Contacts by Region:
           </div>
-          <div className="grid grid-cols-3 gap-space-xs text-center text-label-md font-semibold text-error">
-            <div className="bg-error-container/40 py-2 rounded-lg border border-error/20">
+          <div className="grid grid-cols-3 gap-2.5 text-center text-sm font-bold text-rose-700">
+            <div className="bg-rose-50 py-2.5 rounded-xl border border-rose-200">
               {t.emergencyCallUS}
             </div>
-            <div className="bg-error-container/40 py-2 rounded-lg border border-error/20">
+            <div className="bg-rose-50 py-2.5 rounded-xl border border-rose-200">
               {t.emergencyCallEU}
             </div>
-            <div className="bg-error-container/40 py-2 rounded-lg border border-error/20">
+            <div className="bg-rose-50 py-2.5 rounded-xl border border-rose-200">
               {t.emergencyCallBD}
             </div>
           </div>
         </div>
 
         {/* Dismiss / Close button */}
-        <div className="pt-space-xs flex justify-end">
+        <div className="pt-2 flex justify-end">
           <button
             onClick={onClose}
-            className="bg-surface-container-high hover:bg-surface-container-highest text-on-surface px-space-lg py-2.5 rounded-xl font-headline text-label-md transition-colors"
+            className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-5 py-2.5 rounded-xl text-sm font-bold transition-colors"
           >
             I Understand — Close Notice
           </button>
@@ -80,4 +80,3 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
     </div>
   );
 };
-

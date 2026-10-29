@@ -142,12 +142,39 @@ class SymptomQuestionnaireInput(BaseModel):
     exposure_details: Optional[str] = Field(None, description="Details of exposure, e.g. botanical soap")
     personal_skin_history: Optional[str] = Field("None", description="History of eczema, psoriasis, or skin cancer")
     
+    # Cosmetic Skin Type Questions (Cleanly separated from disease analysis)
+    midday_skin_feel: Optional[str] = Field("balanced", description="midday skin feel: oily, dry, combination, balanced")
+    skin_sensitivity: Optional[str] = Field("rarely_reacts", description="skin reaction tendency: easily_irritated, rarely_reacts")
+    
     # Critical Red-Flag Systemic Emergency Questions
     has_fever_or_chills: bool = Field(False, description="Systemic fever > 100.4F / 38C")
     has_facial_or_throat_swelling: bool = Field(False, description="Lip, tongue, or facial swelling")
     has_breathing_difficulty: bool = Field(False, description="Shortness of breath or wheezing")
     has_rapid_blistering_or_peeling: bool = Field(False, description="Widespread blistering or skin peeling")
     has_petechiae_or_purpura: bool = Field(False, description="Dark purple non-blanching spots with fever")
+
+class CosmeticSkinTypeModel(BaseModel):
+    skin_type: str = "Normal / Balanced"
+    explanation: str = "Balanced oil and hydration levels reported."
+    source: str = "Questionnaire self-report & image context"
+
+class BoundingBoxModel(BaseModel):
+    ymin: int = 0  # 0 to 1000
+    xmin: int = 0
+    ymax: int = 1000
+    xmax: int = 1000
+
+class DetectedAreaModel(BaseModel):
+    has_detection: bool = False
+    bounding_box: Optional[BoundingBoxModel] = None
+    label: Optional[str] = None
+    is_supported: bool = False
+    notes: str = ""
+
+class SkincareProductOptionModel(BaseModel):
+    category: str
+    role: str
+    how_to_use: str
 
 class QualityMetricsModel(BaseModel):
     is_acceptable: bool
@@ -189,6 +216,15 @@ class TriageResultModel(BaseModel):
     critical_warning_signs: List[str]
     diagnostic_gaps: List[str]
     citations: List[Dict[str, str]]
+    
+    # Redesigned 4-Section Fields
+    main_finding: Optional[str] = None
+    confidence_statement: Optional[str] = None
+    cosmetic_skin_type: Optional[CosmeticSkinTypeModel] = None
+    detected_area: Optional[DetectedAreaModel] = None
+    recommended_skincare: List[SkincareProductOptionModel] = Field(default_factory=list)
+    care_level: str = "General self-care"
+    practical_care_tips: List[str] = Field(default_factory=list)
 
 class AssessmentResponse(BaseModel):
     id: int

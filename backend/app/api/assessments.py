@@ -124,7 +124,14 @@ async def analyze_skin(
         clinical_guidance={
             "safe_self_care": triage_result.safe_self_care,
             "what_to_avoid": triage_result.what_to_avoid,
-            "critical_warning_signs": triage_result.critical_warning_signs
+            "critical_warning_signs": triage_result.critical_warning_signs,
+            "main_finding": triage_result.main_finding,
+            "confidence_statement": triage_result.confidence_statement,
+            "cosmetic_skin_type": triage_result.cosmetic_skin_type.model_dump() if triage_result.cosmetic_skin_type else None,
+            "detected_area": triage_result.detected_area.model_dump() if triage_result.detected_area else None,
+            "recommended_skincare": [p.model_dump() for p in triage_result.recommended_skincare],
+            "care_level": triage_result.care_level,
+            "practical_care_tips": triage_result.practical_care_tips
         },
         uncertainties=triage_result.diagnostic_gaps,
         emergency_warning_detected=triage_result.emergency_warning_detected,
@@ -173,6 +180,7 @@ def get_assessment(
 
     image_url = f"/api/skin/images/{assessment.image_filename}" if assessment.image_filename != "EPHEMERAL_PURGED" else "/placeholder-ephemeral.png"
 
+    guidance = assessment.clinical_guidance or {}
     triage_model = TriageResultModel(
         triage_tier=assessment.triage_tier,
         triage_name=assessment.triage_title,
@@ -185,11 +193,18 @@ def get_assessment(
         is_inconclusive=assessment.is_inconclusive,
         inconclusive_reason=assessment.inconclusive_reason,
         possible_conditions=assessment.possible_conditions or [],
-        safe_self_care=(assessment.clinical_guidance or {}).get("safe_self_care", []),
-        what_to_avoid=(assessment.clinical_guidance or {}).get("what_to_avoid", []),
-        critical_warning_signs=(assessment.clinical_guidance or {}).get("critical_warning_signs", []),
+        safe_self_care=guidance.get("safe_self_care", []),
+        what_to_avoid=guidance.get("what_to_avoid", []),
+        critical_warning_signs=guidance.get("critical_warning_signs", []),
         diagnostic_gaps=assessment.uncertainties or [],
-        citations=[]
+        citations=[],
+        main_finding=guidance.get("main_finding", f"Possible visible concern: {assessment.primary_condition}"),
+        confidence_statement=guidance.get("confidence_statement", "Automated visual pattern match. Medical evaluation required for clinical diagnosis."),
+        cosmetic_skin_type=guidance.get("cosmetic_skin_type"),
+        detected_area=guidance.get("detected_area"),
+        recommended_skincare=guidance.get("recommended_skincare", []),
+        care_level=guidance.get("care_level", "General self-care" if assessment.triage_tier == 1 else ("Arrange a doctor visit" if assessment.triage_tier == 2 else "Seek urgent medical care")),
+        practical_care_tips=guidance.get("practical_care_tips", [])
     )
 
     return AssessmentResponse(

@@ -9,11 +9,19 @@
   --font-plus-jakarta: 'Plus Jakarta Sans', sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background-color: #faf8ff;
-  color: #131b2e;
+  background-color: #e8f4f8;
+  color: #1c2834;
   font-family: var(--font-inter);
   -webkit-font-smoothing: antialiased;
+}
+
+.font-headline {
+  font-family: var(--font-plus-jakarta);
 }
 
 .material-symbols-outlined {
@@ -32,18 +40,43 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbars for clean clinical cards */
+/* Glassmorphism helpers matching reference */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 30px rgba(160, 205, 222, 0.3);
+}
+
+/* Hide scrollbar for carousel but keep functional */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f2f3ff;
+  background: #e2f0f5;
 }
 ::-webkit-scrollbar-thumb {
-  background: #bfc7d2;
+  background: #a9d3e0;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #707881;
+  background: #4da8b9;
 }

@@ -45,6 +45,24 @@ export default function AssessPage() {
   const [progressStage, setProgressStage] = useState(1);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
+  // Handle query params from homepage floating panel
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const symptom = params.get("symptom");
+      const duration = params.get("duration");
+      if (symptom) {
+        setExposureDetails(`Primary concern: ${symptom}`);
+      }
+      if (duration) {
+        if (duration === "< 1 week") setDurationDays(4);
+        else if (duration === "1 - 4 weeks") setDurationDays(14);
+        else if (duration === "1 - 6 months") setDurationDays(60);
+        else if (duration === "> 6 months") setDurationDays(180);
+      }
+    }
+  }, []);
+
   // Handle File Selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {

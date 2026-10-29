@@ -6,9 +6,9 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "SkinWise AI — Dermatological Symptom Triage & Clinical Decision Support",
+  title: "SkinWise AI — Understand Your Skin. Know Your Next Step.",
   description:
-    "Ethical, patient-centric AI dermatological symptom triage platform. Understand skin visual patterns, document symptoms, and navigate care pathways safely.",
+    "AI-assisted skin health insights, personalized care guidance, and clear recommendations on when to consult a healthcare professional.",
 };
 
 export default function RootLayout({
@@ -26,11 +26,11 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-surface text-on-surface antialiased min-h-screen flex flex-col">
+      <body className="bg-[#e8f4f8] text-[#1c2834] antialiased min-h-screen flex flex-col font-body">
         <AuthProvider>
           <LanguageProvider>
             <Header />
-            <main className="flex-1 pt-24 sm:pt-28">
+            <main className="flex-1">
               {children}
             </main>
             <Footer />

@@ -1,633 +1,928 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
 
-export default function LandingPage() {
-  const { t } = useLanguage();
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
+export default function HomePage() {
+  const router = useRouter();
+  const { t, lang } = useLanguage();
 
-  const faqs = [
-    {
-      q: "Can SkinWise AI diagnose melanoma or skin cancer?",
-      a: "No. SkinWise AI is not an automated diagnostic device and cannot confirm or rule out skin malignancies. The platform uses deep computer vision to evaluate structural markers (asymmetry, border regularity, color variation) against validated dermatological criteria to assign an auditable clinical triage level (Routine Observation vs. Specialist Examination Recommended). For definitive diagnosis, an in-person physical consultation and histological biopsy by a certified pathologist is mandatory."
-    },
-    {
-      q: "What happens to my uploaded photographs?",
-      a: "Your images undergo immediate client-side anonymization. Sensitive metadata, GPS coordinates, and camera device serials are stripped before server ingestion. Images are processed securely in volatile memory for the duration of the triage scan and are never sold to data brokers or used for third-party advertising. Furthermore, you can toggle Zero-Cloud Image Retention to purge photos immediately after analysis."
-    },
-    {
-      q: "Does the algorithm work accurately across darker skin tones (Fitzpatrick IV–VI)?",
-      a: "Yes. Our testing protocols explicitly counteract historical dermatological dataset bias by evaluating performance across all Fitzpatrick phototypes (Types I through VI). Erythema thresholds and lesion edge contrast meters automatically account for localized baseline skin pigmentation to ensure equitable sensitivity."
-    },
-    {
-      q: "How does the Doctor Referral PDF export function work?",
-      a: "With one click, you can generate a standardized pre-consultation clinical summary PDF (aligned with HL7/FHIR clinical document standards). The dossier compiles your lesion capture, optical quality scores, reported symptom timelines, and primary differential considerations so your dermatologist can review structured evidence prior to examination."
+  // Floating Intake Panel State
+  const [selectedSymptom, setSelectedSymptom] = useState("");
+  const [selectedDuration, setSelectedDuration] = useState("");
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Selected educational modal for skin concerns
+  const [activeConcern, setActiveConcern] = useState<any | null>(null);
+
+  // Interactive Results Preview State (Toggle between Standard, Inconclusive, and Urgent)
+  const [previewMode, setPreviewMode] = useState<"standard" | "inconclusive" | "urgent">("standard");
+
+  // Carousel ref for Featured Capabilities
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  const scrollCarousel = (direction: "left" | "right") => {
+    if (carouselRef.current) {
+      const scrollAmount = direction === "left" ? -340 : 340;
+      carouselRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
     }
+  };
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPreviewImage(reader.result as string);
+        setPhotoError(false);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleStartAnalysis = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Validate entry point
+    if (!selectedSymptom && !previewImage) {
+      setPhotoError(true);
+      return;
+    }
+    // Navigate to full intake workflow with query params
+    const query = new URLSearchParams();
+    if (selectedSymptom) query.set("symptom", selectedSymptom);
+    if (selectedDuration) query.set("duration", selectedDuration);
+    router.push(`/assess?${query.toString()}`);
+  };
+
+  // Common Skin Concerns data matching reference card layout
+  const skinConcerns = [
+    {
+      id: "acne",
+      title: "Acne & Pimples",
+      subtitle: "Papules, pustules, comedones & inflammatory lesions",
+      icon: "flare",
+      badge: "Tier 1 / Self-Care",
+      description: "Follicular hyperkeratinization combined with sebaceous activity. Evaluated for inflammatory vs non-inflammatory distribution.",
+      clinicalContext: "Characterized by microcomedones evolving into papules or cystic nodules. Often managed with topical retinoids, benzoyl peroxide, and gentle non-comedogenic cleansing.",
+    },
+    {
+      id: "eczema",
+      title: "Eczema & Irritation",
+      subtitle: "Atopic dermatitis, xerosis & epidermal barrier impairment",
+      icon: "water_drop",
+      badge: "Tier 1-2 / Monitoring",
+      description: "Pruritic, erythematous patches with disrupted epidermal lipids. Often triggers lichenification under repeated excoriation.",
+      clinicalContext: "Presents with intense pruritus, xerosis, and flexural predilection in adults. Management centers on skin barrier hydration and topical anti-inflammatory therapy.",
+    },
+    {
+      id: "fungal",
+      title: "Possible Fungal Infections",
+      subtitle: "Tinea corporis, pityriasis versicolor & dermatophytosis",
+      icon: "coronavirus",
+      badge: "Tier 2 / Doctor Recommended",
+      description: "Annular erythematous plaques with central clearing and active scaly peripheral margins, responding to antifungal agents.",
+      clinicalContext: "Frequently transmitted via contact or damp environments. Definitive confirmation typically utilizes potassium hydroxide (KOH) microscopy by a clinician.",
+    },
+    {
+      id: "rashes",
+      title: "Rashes & Contact Dermatitis",
+      subtitle: "Allergic response, irritant exposure & acute urticaria",
+      icon: "grain",
+      badge: "Tier 2 / Assessment",
+      description: "Demarcated inflammatory responses following direct chemical, metal (nickel), or botanical irritant contact.",
+      clinicalContext: "Features well-demarcated vesicles or erythematous plaques conforming to exposure zones. Patch testing may be indicated for chronic recurrent presentations.",
+    },
+    {
+      id: "pigment",
+      title: "Pigmentation Changes",
+      subtitle: "Melasma, post-inflammatory hyperpigmentation & vitiligo",
+      icon: "contrast",
+      badge: "Tier 1-2 / Elective Review",
+      description: "Localized hypermelanosis or melanocyte depletion following ultraviolet exposure or resolved dermal inflammation.",
+      clinicalContext: "Macular pigmentary alterations without palpable induration. Photoprotection with broad-spectrum zinc oxide or titanium dioxide SPF 50+ is fundamental.",
+    },
+    {
+      id: "lesions",
+      title: "Moles & Changing Lesions",
+      subtitle: "Nevi evaluation, irregular borders & pigmented macules",
+      icon: "shield_with_heart",
+      badge: "Tier 2-3 / High Vigilance",
+      description: "Screened against the ABCDE criteria: Asymmetry, Border irregularity, Color variegation, Diameter > 6mm, and Evolution.",
+      clinicalContext: "Any dynamic lesion demonstrating evolutionary change, bleeding, or jagged margins requires prompt in-person dermatoscope assessment and potential biopsy.",
+    },
+  ];
+
+  // Featured AI Capabilities Cards matching reference carousel
+  const featureCards = [
+    {
+      title: "AI Skin Photo Analysis",
+      description: "Upload high-resolution dermoscopic or macro photographs for computerized assessment of visual lesion morphology and texture features.",
+      tag: "Computer Vision & ABCDE",
+      image: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=600&auto=format&fit=crop&q=80",
+    },
+    {
+      title: "Personalized Care Guidance",
+      description: "Receive practical next-step guidance derived from accredited medical sources (AAD, BAD, DermNet NZ) contextualized to your specific presentation.",
+      tag: "Evidence-Based Guidance",
+      image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80",
+    },
+    {
+      title: "Symptom Assessment",
+      description: "Answer structured clinical questionnaires regarding duration, itching, anatomical site, spreading, and systemic danger signs.",
+      tag: "Multimodal Context",
+      image: "https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=600&auto=format&fit=crop&q=80",
+    },
+    {
+      title: "Doctor Referral Guidance",
+      description: "Identify when in-person dermatologist evaluation is essential, with one-click HL7-aligned clinical dossier PDF generation for your physician.",
+      tag: "Clinical Escalation",
+      image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=600&auto=format&fit=crop&q=80",
+    },
   ];
 
   return (
-    <div className="flex flex-col w-full">
-      {/* 1. Trust Ticker / Clinical Assurance Bar */}
-      <section className="w-full bg-surface-container-low py-2.5 border-b border-surface-container-high/60 shadow-xs">
-        <div className="max-w-7xl mx-auto px-gutter flex flex-wrap items-center justify-between gap-space-sm text-xs">
-          <div className="flex items-center gap-space-xs">
-            <span className="inline-flex items-center justify-center w-2 h-2 rounded-full bg-tertiary animate-pulse" />
-            <span className="font-headline font-bold text-tertiary uppercase tracking-wider">
-              Clinical Triage Engine v4.2 Active
-            </span>
-          </div>
-          <div className="flex items-center gap-space-md text-on-surface-variant font-medium">
-            <span className="flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm text-primary">lock</span>
-              AES-256 Client-Side Anonymization
-            </span>
-            <span className="hidden md:flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm text-secondary">verified</span>
-              CE Class I SaMD Framework
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm text-tertiary">shield</span>
-              ISO 27001 & HIPAA Aligned
-            </span>
-          </div>
-        </div>
-      </section>
+    <div className="min-h-screen bg-[#e8f4f8] text-[#1c2834]">
+      {/* =========================================================================
+          HERO SECTION (Recreating the exact rounded container & medical visual)
+          ========================================================================= */}
+      <section className="px-3 sm:px-6 pt-4 pb-12">
+        <div className="max-w-6xl mx-auto rounded-4xl sm:rounded-5xl bg-gradient-to-b from-[#e1f0f5] via-[#e8f4f8] to-[#edf6fa] border border-white/80 shadow-[0_16px_40px_rgba(160,205,222,0.35)] relative overflow-hidden p-6 sm:p-10 lg:p-14">
+          
+          {/* Subtle Ambient Glows */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-[#4da8b9]/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-80 h-80 bg-white/70 rounded-full blur-2xl pointer-events-none" />
 
-      {/* 2. Hero & Live Clinical Preview */}
-      <section className="w-full px-gutter py-space-xl lg:py-20 relative overflow-hidden">
-        {/* Ambient background glows */}
-        <div className="absolute -top-32 right-1/4 w-96 h-96 bg-primary-fixed/20 rounded-full blur-3xl pointer-events-none -z-10" />
-        <div className="absolute top-1/2 left-0 w-80 h-80 bg-tertiary-fixed-dim/15 rounded-full blur-3xl pointer-events-none -z-10" />
+          {/* Hero Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
+            
+            {/* Left Column: Headlines & CTAs */}
+            <div className="lg:col-span-7 space-y-6">
+              
+              {/* Trust Badge Pill */}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-[#cde5ee] shadow-xs text-xs font-semibold text-[#328493]">
+                <span className="w-2 h-2 rounded-full bg-[#4da8b9] animate-pulse" />
+                <span>CE Class I Decision Support • HIPAA Ready</span>
+              </div>
 
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-gutter items-center">
-          {/* Left Column: Value Proposition */}
-          <div className="lg:col-span-6 space-y-space-lg">
-            <div className="inline-flex items-center gap-space-xs bg-surface-container-high px-space-md py-1 rounded-full shadow-xs">
-              <span className="material-symbols-outlined text-primary text-base">neurology</span>
-              <span className="font-headline text-label-sm text-on-surface uppercase tracking-wider font-bold">
-                Dermatology AI • Clinical Safety First
-              </span>
-            </div>
-
-            <div className="space-y-space-md">
-              <h1 className="font-headline font-bold text-3xl sm:text-4xl lg:text-5xl text-on-background tracking-tight leading-tight">
-                Understand Your Skin. <br />
-                <span className="text-primary">Know Your Next Step.</span>
+              {/* Exact Requested Headline */}
+              <h1 className="font-headline text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#1c2834] tracking-tight leading-[1.15]">
+                Understand Your Skin.
+                <br />
+                <span className="text-[#4da8b9]">Know Your Next Step.</span>
               </h1>
-              <p className="text-body-lg text-on-surface-variant max-w-xl leading-relaxed">
-                AI-assisted dermatological photo & symptom analysis designed with clinical reassurance, privacy safeguards, and clear medical triage pathways.
+
+              {/* Supporting Text */}
+              <p className="text-sm sm:text-base text-[#526373] leading-relaxed max-w-xl">
+                Get AI-assisted skin health insights, personalized care guidance, and clear recommendations on when to consult a healthcare professional.
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Link
+                  href="/assess"
+                  className="bg-[#4da8b9] hover:bg-[#3a96a7] text-white text-sm font-bold px-7 py-3.5 rounded-full shadow-[0_6px_20px_rgba(77,168,185,0.4)] transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">dermatology</span>
+                  <span>Analyze My Skin</span>
+                </Link>
+
+                <a
+                  href="#how-it-works"
+                  className="bg-white/80 hover:bg-white text-[#1c2834] text-sm font-bold px-6 py-3.5 rounded-full border border-white/80 shadow-xs transition-all hover:shadow-sm flex items-center gap-1.5"
+                >
+                  <span>How It Works</span>
+                  <span className="material-symbols-outlined text-base text-[#526373]">arrow_downward</span>
+                </a>
+              </div>
+
+              {/* Trust Statement */}
+              <p className="text-[11px] text-[#6b7c8d] max-w-lg flex items-center gap-1.5 pt-1">
+                <span className="material-symbols-outlined text-sm text-[#4da8b9]">verified</span>
+                <span>Provides informational symptom triage. Does not replace in-person consultation with a medical doctor.</span>
               </p>
             </div>
 
-            {/* CTAs */}
-            <div className="flex flex-wrap items-center gap-space-md pt-space-xs">
-              <Link
-                href="/assess"
-                className="inline-flex items-center gap-space-xs bg-primary hover:bg-secondary text-on-primary px-space-xl py-3.5 rounded-xl font-headline text-label-md font-semibold transition-all shadow-md hover:shadow-lg active:scale-95"
-              >
-                <span className="material-symbols-outlined text-xl">photo_camera</span>
-                <span>Check Your Skin</span>
-                <span className="material-symbols-outlined text-sm ml-1">arrow_forward</span>
-              </Link>
-              <a
-                href="#how-it-works"
-                className="inline-flex items-center gap-space-xs bg-surface-container-lowest hover:bg-surface-container text-on-surface px-space-lg py-3.5 rounded-xl font-headline text-label-md font-semibold transition-all shadow-xs border border-surface-container-high"
-              >
-                <span className="material-symbols-outlined text-xl text-primary">play_circle</span>
-                <span>How It Works</span>
-              </a>
-            </div>
+            {/* Right Column: Realistic Doctor & Patient Photography */}
+            <div className="lg:col-span-5 relative">
+              <div className="relative mx-auto max-w-sm lg:max-w-none">
+                {/* Doctor Visual Card */}
+                <div className="rounded-3xl sm:rounded-4xl overflow-hidden border-4 border-white shadow-[0_12px_36px_rgba(140,195,215,0.35)] relative aspect-[4/4.2]">
+                  <img
+                    src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=800&auto=format&fit=crop&q=80"
+                    alt="Dermatologist in consultation with patient"
+                    className="w-full h-full object-cover object-top"
+                  />
+                  {/* Subtle Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#1c2834]/30 via-transparent to-transparent pointer-events-none" />
+                </div>
 
-            {/* Metrics Strip */}
-            <div className="pt-space-md grid grid-cols-3 gap-space-md max-w-lg">
-              <div className="bg-surface-container-lowest p-space-sm rounded-xl shadow-xs border border-surface-container-high">
-                <div className="font-headline font-bold text-xl text-primary">98.4%</div>
-                <div className="text-xs text-on-surface-variant">Quality gate accuracy</div>
-              </div>
-              <div className="bg-surface-container-lowest p-space-sm rounded-xl shadow-xs border border-surface-container-high">
-                <div className="font-headline font-bold text-xl text-tertiary">30 Sec</div>
-                <div className="text-xs text-on-surface-variant">Structured guidance</div>
-              </div>
-              <div className="bg-surface-container-lowest p-space-sm rounded-xl shadow-xs border border-surface-container-high">
-                <div className="font-headline font-bold text-xl text-secondary">Zero-Log</div>
-                <div className="text-xs text-on-surface-variant">Biometric storage</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Live Clinical Preview Card */}
-          <div className="lg:col-span-6 relative" id="triage-preview">
-            <div className="bg-surface-container-lowest rounded-2xl shadow-xl p-space-lg relative overflow-hidden border border-surface-container-high">
-              {/* Header */}
-              <div className="flex items-center justify-between pb-space-md border-b border-surface-container-high">
-                <div className="flex items-center gap-space-sm">
-                  <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-primary font-bold">
+                {/* Floating Optical Badge */}
+                <div className="absolute -bottom-4 -left-4 sm:-bottom-5 sm:-left-5 bg-white/90 backdrop-blur-md border border-white/90 rounded-2xl p-3 shadow-lg flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#e6f5f7] text-[#4da8b9] flex items-center justify-center">
                     <span className="material-symbols-outlined text-xl">biotech</span>
                   </div>
                   <div>
-                    <div className="font-headline font-semibold text-label-md text-on-surface">
-                      Specimen Preview: Dorsal Forearm
-                    </div>
-                    <div className="text-xs text-on-surface-variant flex items-center gap-1">
-                      <span>Session #SW-9042</span> • <span>Macro calibrated</span>
-                    </div>
+                    <div className="text-[10px] uppercase font-bold tracking-wider text-[#526373]">Optical Quality</div>
+                    <div className="text-xs font-extrabold text-[#1c2834]">Laplacian & Lux Matrix</div>
                   </div>
-                </div>
-
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-headline text-xs font-bold uppercase">
-                  <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-                  <span>Routine Derm Consult</span>
                 </div>
               </div>
+            </div>
+          </div>
 
-              {/* Viewport Split: Specimen + HUD */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md my-space-md">
-                <div className="relative rounded-xl overflow-hidden shadow-xs bg-inverse-surface aspect-square flex items-center justify-center">
-                  <div className="absolute inset-0 bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center">
-                    {/* Simulated skin lesion canvas */}
-                    <div className="w-24 h-24 rounded-full bg-amber-900/60 blur-xs border border-amber-950/40 relative shadow-inner">
-                      <div className="absolute top-4 left-6 w-8 h-8 rounded-full bg-amber-950/70" />
-                    </div>
-                  </div>
-                  {/* HUD Overlay */}
-                  <div className="absolute inset-0 p-3 flex flex-col justify-between pointer-events-none">
-                    <div className="flex justify-between items-center text-white text-[11px] font-mono">
-                      <span className="bg-inverse-surface/80 backdrop-blur-xs px-2 py-0.5 rounded">
-                        Focal lock 100%
+          {/* =========================================================================
+              FLOATING SKIN ANALYSIS PANEL (Lower Hero Translucent Appointment Form)
+              ========================================================================= */}
+          <div className="mt-12 sm:mt-16 pt-2">
+            <div className="glass-pill rounded-3xl sm:rounded-4xl p-4 sm:p-5 shadow-[0_12px_35px_rgba(140,190,210,0.3)] border border-white/90">
+              <form onSubmit={handleStartAnalysis} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 items-center">
+                
+                {/* Field 1: Skin Photo Upload */}
+                <div className="relative">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#526373] mb-1 pl-2">
+                    Skin Photo
+                  </label>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoSelect}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-2xl bg-white/90 border text-xs font-semibold transition-all ${
+                      photoError
+                        ? "border-[#ba1a1a] text-[#ba1a1a] bg-rose-50"
+                        : "border-[#cde5ee] hover:border-[#4da8b9] text-[#1c2834]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="material-symbols-outlined text-base text-[#4da8b9]">
+                        {previewImage ? "check_circle" : "add_photo_alternate"}
                       </span>
-                      <span className="material-symbols-outlined text-tertiary-fixed text-base">
-                        center_focus_strong
+                      <span className="truncate">
+                        {previewImage ? "Photo Selected" : "Upload Photo"}
                       </span>
                     </div>
-                    <div className="bg-inverse-surface/85 backdrop-blur-xs text-white text-xs px-2 py-1 rounded">
-                      <span className="text-secondary-fixed font-semibold">Target:</span> 4.2mm Pigmented Macule
-                    </div>
+                    <span className="text-[10px] text-[#526373] bg-[#eef7fa] px-2 py-0.5 rounded-full">
+                      JPEG/PNG
+                    </span>
+                  </button>
+                </div>
+
+                {/* Field 2: Main Symptom Selector */}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#526373] mb-1 pl-2">
+                    Main Symptom
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedSymptom}
+                      onChange={(e) => {
+                        setSelectedSymptom(e.target.value);
+                        setPhotoError(false);
+                      }}
+                      className="w-full appearance-none px-4 py-2.5 rounded-2xl bg-white/90 border border-[#cde5ee] hover:border-[#4da8b9] text-xs font-semibold text-[#1c2834] focus:outline-none focus:border-[#4da8b9] transition-all pr-8"
+                    >
+                      <option value="">Select Symptom...</option>
+                      <option value="Rash or Itching">Rash or Itching</option>
+                      <option value="Acne or Blemish">Acne or Blemish</option>
+                      <option value="Changing Mole / Spot">Changing Mole / Spot</option>
+                      <option value="Dry Red Patch">Dry Red Patch</option>
+                      <option value="Painful / Swollen Bump">Painful / Swollen Bump</option>
+                      <option value="Flaking or Peeling">Flaking or Peeling</option>
+                    </select>
+                    <span className="material-symbols-outlined text-sm text-[#526373] absolute right-3 top-3 pointer-events-none">
+                      expand_more
+                    </span>
                   </div>
                 </div>
 
-                {/* Pre-Assessment Quality Meters */}
-                <div className="bg-surface-container-low p-space-md rounded-xl space-y-3 flex flex-col justify-center">
-                  <div className="font-headline text-xs text-on-surface uppercase tracking-wider font-bold flex items-center gap-1">
-                    <span className="material-symbols-outlined text-base text-primary">verified_user</span>
-                    Optical Viability Matrix
-                  </div>
-
-                  {/* Meter 1: Lighting */}
-                  <div>
-                    <div className="flex justify-between text-xs text-on-surface-variant mb-1">
-                      <span>Lighting Balance</span>
-                      <span className="font-semibold text-on-surface">98% Optimal</span>
-                    </div>
-                    <div className="w-full bg-surface-container-highest h-2 rounded-full overflow-hidden">
-                      <div className="bg-tertiary h-full rounded-full" style={{ width: "98%" }} />
-                    </div>
-                  </div>
-
-                  {/* Meter 2: Sharpness */}
-                  <div>
-                    <div className="flex justify-between text-xs text-on-surface-variant mb-1">
-                      <span>Edge Sharpness</span>
-                      <span className="font-semibold text-on-surface">94% High</span>
-                    </div>
-                    <div className="w-full bg-surface-container-highest h-2 rounded-full overflow-hidden">
-                      <div className="bg-primary h-full rounded-full" style={{ width: "94%" }} />
-                    </div>
-                  </div>
-
-                  {/* Meter 3: Glare */}
-                  <div>
-                    <div className="flex justify-between text-xs text-on-surface-variant mb-1">
-                      <span>Color Fidelity</span>
-                      <span className="font-semibold text-on-surface">ΔE &lt; 1.2</span>
-                    </div>
-                    <div className="w-full bg-surface-container-highest h-2 rounded-full overflow-hidden">
-                      <div className="bg-secondary h-full rounded-full" style={{ width: "91%" }} />
-                    </div>
+                {/* Field 3: Duration Selector */}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#526373] mb-1 pl-2">
+                    Duration
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedDuration}
+                      onChange={(e) => setSelectedDuration(e.target.value)}
+                      className="w-full appearance-none px-4 py-2.5 rounded-2xl bg-white/90 border border-[#cde5ee] hover:border-[#4da8b9] text-xs font-semibold text-[#1c2834] focus:outline-none focus:border-[#4da8b9] transition-all pr-8"
+                    >
+                      <option value="">Select Duration...</option>
+                      <option value="< 1 week">Less than 1 week</option>
+                      <option value="1 - 4 weeks">1 - 4 weeks</option>
+                      <option value="1 - 6 months">1 - 6 months</option>
+                      <option value="> 6 months">More than 6 months</option>
+                    </select>
+                    <span className="material-symbols-outlined text-sm text-[#526373] absolute right-3 top-3 pointer-events-none">
+                      calendar_today
+                    </span>
                   </div>
                 </div>
-              </div>
 
-              {/* Diagnostic Evidence Breakdown */}
-              <div className="bg-surface-container-low p-space-sm rounded-xl space-y-2 mb-space-md">
-                <div className="text-xs font-headline font-semibold text-on-surface flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-primary text-base">rule</span>
-                    ABCDE Pattern Correlation
-                  </span>
-                  <span className="text-[11px] text-on-surface-variant">Validated Criteria</span>
+                {/* Field 4: Primary Action Button ("Start Analysis" matching "Book Now") */}
+                <div className="sm:self-end pt-2 sm:pt-0">
+                  <button
+                    type="submit"
+                    className="w-full bg-[#4da8b9] hover:bg-[#3a96a7] text-white text-xs sm:text-sm font-bold py-2.5 sm:py-3 px-5 rounded-2xl shadow-[0_4px_16px_rgba(77,168,185,0.4)] transition-all flex items-center justify-center gap-2 transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                  >
+                    <span>Start Analysis</span>
+                    <span className="material-symbols-outlined text-base">arrow_forward</span>
+                  </button>
                 </div>
-                <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-                  <div className="bg-surface-container-lowest p-2 rounded-lg">
-                    <div className="text-[11px] text-on-surface-variant">Asymmetry</div>
-                    <div className="text-xs font-bold text-tertiary">0.12 (Symmetric)</div>
-                  </div>
-                  <div className="bg-surface-container-lowest p-2 rounded-lg">
-                    <div className="text-[11px] text-on-surface-variant">Border Margin</div>
-                    <div className="text-xs font-bold text-tertiary">Defined</div>
-                  </div>
-                  <div className="bg-surface-container-lowest p-2 rounded-lg">
-                    <div className="text-[11px] text-on-surface-variant">Color Saturation</div>
-                    <div className="text-xs font-bold text-secondary">Monotone</div>
-                  </div>
-                </div>
-              </div>
+              </form>
 
-              {/* Mandatory Notice */}
-              <div className="bg-surface-container-low p-space-sm rounded-xl flex items-start gap-space-xs text-xs text-on-surface-variant">
-                <span className="material-symbols-outlined text-primary text-base mt-0.5 shrink-0">info</span>
-                <p>
-                  <strong className="text-on-surface font-semibold">Pre-Consultation Triage:</strong>{" "}
-                  This analysis indicates low probability of atypical dysplasia. Routine observation recommended. If lesion develops rapid bleeding, itching, or size change, consult a dermatologist promptly.
-                </p>
-              </div>
+              {photoError && (
+                <div className="mt-2 text-[11px] text-[#ba1a1a] flex items-center gap-1 pl-2">
+                  <span className="material-symbols-outlined text-sm">info</span>
+                  <span>Please select a primary symptom or choose a photograph to launch the intake workflow.</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3. Patient Safety Architecture (Trust Pillars) */}
-      <section className="w-full bg-surface-container-low py-space-xl border-y border-surface-container-high/60">
-        <div className="max-w-7xl mx-auto px-gutter">
-          <div className="text-center max-w-2xl mx-auto mb-space-lg space-y-space-xs">
-            <h2 className="font-headline font-bold text-xs uppercase tracking-wider text-primary">
-              Patient Safety Architecture
-            </h2>
-            <p className="font-headline font-bold text-2xl sm:text-3xl text-on-background">
-              Engineered to clinical scrutiny, not Silicon Valley hype.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
-            {/* Pillar 1 */}
-            <div className="bg-surface-container-lowest p-space-lg rounded-2xl shadow-xs border border-surface-container-high space-y-space-sm flex flex-col justify-between">
-              <div>
-                <div className="w-12 h-12 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center mb-space-md">
-                  <span className="material-symbols-outlined text-2xl text-on-primary">enhanced_encryption</span>
-                </div>
-                <h3 className="font-headline font-bold text-headline-sm text-on-surface mb-1">
-                  Zero Identity Storage
-                </h3>
-                <p className="text-body-sm text-on-surface-variant leading-relaxed">
-                  Every captured frame is desensitized client-side. Metadata, EXIF coordinates, and facial markers are permanently scrubbed before model evaluation.
-                </p>
-              </div>
-              <div className="pt-space-sm font-headline text-xs font-bold text-primary">
-                Zero Cloud Retention Toggle
-              </div>
-            </div>
-
-            {/* Pillar 2 */}
-            <div className="bg-surface-container-lowest p-space-lg rounded-2xl shadow-xs border border-surface-container-high space-y-space-sm flex flex-col justify-between">
-              <div>
-                <div className="w-12 h-12 rounded-xl bg-tertiary-container text-on-tertiary-container flex items-center justify-center mb-space-md">
-                  <span className="material-symbols-outlined text-2xl text-on-tertiary">medical_information</span>
-                </div>
-                <h3 className="font-headline font-bold text-headline-sm text-on-surface mb-1">
-                  Clinical Guardrails
-                </h3>
-                <p className="text-body-sm text-on-surface-variant leading-relaxed">
-                  Calibrated strictly to probabilistic triage boundaries. The system refuses to output definitive diagnosis labels, routing uncertain patterns straight to licensed specialists.
-                </p>
-              </div>
-              <div className="pt-space-sm font-headline text-xs font-bold text-tertiary">
-                Probabilistic Triage Only
-              </div>
-            </div>
-
-            {/* Pillar 3 */}
-            <div className="bg-surface-container-lowest p-space-lg rounded-2xl shadow-xs border border-surface-container-high space-y-space-sm flex flex-col justify-between">
-              <div>
-                <div className="w-12 h-12 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center mb-space-md">
-                  <span className="material-symbols-outlined text-2xl text-on-secondary">fact_check</span>
-                </div>
-                <h3 className="font-headline font-bold text-headline-sm text-on-surface mb-1">
-                  Board-Vetted Protocol
-                </h3>
-                <p className="text-body-sm text-on-surface-variant leading-relaxed">
-                  The ABCDE dermatological framework and symptom weightings are designed alongside board-certified dermatologists across varied Fitzpatrick skin types.
-                </p>
-              </div>
-              <div className="pt-space-sm font-headline text-xs font-bold text-secondary">
-                Diverse Skin Phototypes
-              </div>
-            </div>
-
-            {/* Pillar 4 */}
-            <div className="bg-surface-container-lowest p-space-lg rounded-2xl shadow-xs border border-surface-container-high space-y-space-sm flex flex-col justify-between">
-              <div>
-                <div className="w-12 h-12 rounded-xl bg-surface-container-high text-primary flex items-center justify-center mb-space-md">
-                  <span className="material-symbols-outlined text-2xl">verified_user</span>
-                </div>
-                <h3 className="font-headline font-bold text-headline-sm text-on-surface mb-1">
-                  HIPAA & GDPR Compliant
-                </h3>
-                <p className="text-body-sm text-on-surface-variant leading-relaxed">
-                  Full European General Data Protection Regulation and US HIPAA adherence with complete, instantaneous user-authorized self-deletion rights.
-                </p>
-              </div>
-              <div className="pt-space-sm font-headline text-xs font-bold text-on-surface-variant">
-                Revocable Consent Model
-              </div>
-            </div>
-          </div>
+      {/* =========================================================================
+          EXPLORE COMMON SKIN CONCERNS (Replaces "Our Departments" Section)
+          ========================================================================= */}
+      <section id="skin-conditions" className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+        <div className="text-center mb-10">
+          <h2 className="font-headline text-2xl sm:text-3xl font-extrabold text-[#1c2834] tracking-tight">
+            Explore Common Skin Concerns
+          </h2>
+          <p className="text-xs sm:text-sm text-[#526373] mt-2 max-w-xl mx-auto">
+            Review medically reviewed educational information on frequently observed dermatological presentations.
+          </p>
         </div>
-      </section>
 
-      {/* 4. Three Steps to Diagnostic Clarity */}
-      <section className="w-full py-space-xl lg:py-24" id="how-it-works">
-        <div className="max-w-7xl mx-auto px-gutter">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-space-md mb-space-xl">
-            <div className="space-y-space-xs">
-              <span className="font-headline text-xs font-bold text-secondary uppercase tracking-widest">
-                System Workflow
-              </span>
-              <h2 className="font-headline font-bold text-2xl sm:text-3xl text-on-background">
-                Three Steps to Diagnostic Clarity
-              </h2>
-            </div>
-            <p className="text-body-md text-on-surface-variant max-w-md leading-relaxed">
-              Simple enough for emergency bedside self-triage, rigorous enough to generate a doctor-ready assessment summary.
-            </p>
-          </div>
+        {/* 3 Raised Squircle Cards Per Row (Desktop) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {skinConcerns.map((item) => (
+            <div
+              key={item.id}
+              onClick={() => setActiveConcern(item)}
+              className="bg-white rounded-3xl p-7 border border-white/90 shadow-med-card hover:shadow-med-card-hover transition-all duration-300 transform hover:-translate-y-1.5 flex flex-col items-center text-center cursor-pointer group"
+            >
+              {/* Soft Medical Glyph Icon */}
+              <div className="w-16 h-16 rounded-2xl bg-[#eaf5f7] text-[#4da8b9] group-hover:bg-[#4da8b9] group-hover:text-white flex items-center justify-center mb-5 transition-colors shadow-xs">
+                <span className="material-symbols-outlined text-3xl">{item.icon}</span>
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter">
-            {/* Step 1 */}
-            <div className="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm border border-surface-container-high space-y-space-md group hover:shadow-md transition-all">
-              <div className="flex items-center justify-between">
-                <span className="w-10 h-10 rounded-full bg-primary-container text-on-primary font-headline font-bold text-lg flex items-center justify-center">
-                  1
+              {/* Title & Subtitle */}
+              <h3 className="font-headline text-base sm:text-lg font-bold text-[#1c2834] group-hover:text-[#4da8b9] transition-colors">
+                {item.title}
+              </h3>
+              <p className="text-xs text-[#526373] mt-2 line-clamp-2 leading-relaxed">
+                {item.description}
+              </p>
+
+              <div className="mt-5 pt-4 border-t border-[#f0f6f8] w-full flex items-center justify-between text-[11px]">
+                <span className="text-[#3a8b98] font-semibold bg-[#eef7fa] px-2.5 py-0.5 rounded-full">
+                  {item.badge}
                 </span>
-                <span className="material-symbols-outlined text-secondary text-2xl">photo_camera</span>
-              </div>
-              <div className="h-40 rounded-xl bg-surface-container-low flex items-center justify-center p-4">
-                <div className="border-2 border-dashed border-primary/40 rounded-xl w-full h-full flex flex-col items-center justify-center gap-2 text-primary text-xs font-medium">
-                  <span className="material-symbols-outlined text-3xl">center_focus_strong</span>
-                  <span>Optical Macro Guidance</span>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-headline font-bold text-lg text-on-surface mb-1">
-                  Capture Guided Photo
-                </h3>
-                <p className="text-body-sm text-on-surface-variant leading-relaxed">
-                  Our smart sensor validates focal sharpness, ambient glare, and camera distance in real-time, preventing blurry or deceptive submissions.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 2 */}
-            <div className="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm border border-surface-container-high space-y-space-md group hover:shadow-md transition-all">
-              <div className="flex items-center justify-between">
-                <span className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary font-headline font-bold text-lg flex items-center justify-center">
-                  2
+                <span className="text-[#4da8b9] font-bold group-hover:underline flex items-center">
+                  <span>Learn more</span>
+                  <span className="material-symbols-outlined text-xs">chevron_right</span>
                 </span>
-                <span className="material-symbols-outlined text-secondary text-2xl">checklist</span>
-              </div>
-              <div className="h-40 rounded-xl bg-surface-container-low flex items-center justify-center p-4">
-                <div className="bg-surface-container-lowest rounded-xl p-3 shadow-xs w-full space-y-2 text-xs">
-                  <div className="flex justify-between font-semibold text-on-surface">
-                    <span>Pruritus (Itching)</span>
-                    <span className="text-secondary">VAS 7/10</span>
-                  </div>
-                  <div className="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
-                    <div className="bg-secondary h-full rounded-full" style={{ width: "70%" }} />
-                  </div>
-                  <div className="text-[11px] text-on-surface-variant">Onset: 5 days ago</div>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-headline font-bold text-lg text-on-surface mb-1">
-                  Targeted Symptom Triage
-                </h3>
-                <p className="text-body-sm text-on-surface-variant leading-relaxed">
-                  Answer contextual clinical questions: evolution over time, sensory irritation (itching, burning), prior exposures, and systemic flags.
-                </p>
               </div>
             </div>
-
-            {/* Step 3 */}
-            <div className="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm border border-surface-container-high space-y-space-md group hover:shadow-md transition-all">
-              <div className="flex items-center justify-between">
-                <span className="w-10 h-10 rounded-full bg-tertiary-container text-on-tertiary font-headline font-bold text-lg flex items-center justify-center">
-                  3
-                </span>
-                <span className="material-symbols-outlined text-tertiary text-2xl">description</span>
-              </div>
-              <div className="h-40 rounded-xl bg-surface-container-low flex items-center justify-center p-4">
-                <div className="bg-surface-container-lowest rounded-xl p-3 shadow-xs w-full space-y-2 text-xs border border-surface-container-high">
-                  <div className="flex items-center gap-1.5 text-amber-700 font-bold">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    <span>Doctor Recommended</span>
-                  </div>
-                  <div className="text-[11px] text-on-surface-variant">Timeline: Within 1–2 Weeks</div>
-                  <div className="bg-surface-container-high/60 py-1 px-2 rounded text-[11px] text-primary font-semibold flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs">picture_as_pdf</span>
-                    <span>PDF Referral Dossier Ready</span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-headline font-bold text-lg text-on-surface mb-1">
-                  Triage Action Guidance
-                </h3>
-                <p className="text-body-sm text-on-surface-variant leading-relaxed">
-                  Instantly view clear recommendations: routine monitoring vs. specialist scheduling, evidence breakdown, and a clinical PDF summary to share with your doctor.
-                </p>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
-      </section>
 
-      {/* 5. Algorithmic Capabilities Bento Grid */}
-      <section className="w-full bg-surface-container-low py-space-xl lg:py-24 border-y border-surface-container-high/60">
-        <div className="max-w-7xl mx-auto px-gutter">
-          <div className="max-w-2xl mb-space-xl space-y-space-xs">
-            <span className="font-headline text-xs font-bold text-primary uppercase tracking-widest">
-              Algorithmic Capabilities
-            </span>
-            <h2 className="font-headline font-bold text-2xl sm:text-3xl text-on-background">
-              Engineered to Augment Clinical Triage
-            </h2>
-            <p className="text-body-md text-on-surface-variant leading-relaxed">
-              Advanced computer vision calibrated with clinical caution to minimize false reassurance and unnecessary emergency visits.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-gutter">
-            {/* Feature 1: Edge & Pattern (7 cols) */}
-            <div className="md:col-span-7 bg-surface-container-lowest rounded-2xl p-space-xl shadow-xs border border-surface-container-high flex flex-col justify-between">
-              <div className="space-y-space-sm mb-space-lg">
-                <div className="inline-flex p-space-sm rounded-xl bg-primary-container text-on-primary">
-                  <span className="material-symbols-outlined text-2xl">texture</span>
+        {/* Educational Detail Modal */}
+        {activeConcern && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-white/80 animate-in fade-in zoom-in-95">
+              <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#eaf5f7] text-[#4da8b9] flex items-center justify-center">
+                    <span className="material-symbols-outlined text-2xl">{activeConcern.icon}</span>
+                  </div>
+                  <div>
+                    <h3 className="font-headline text-lg font-bold text-[#1c2834]">{activeConcern.title}</h3>
+                    <span className="text-[11px] text-[#4da8b9] font-semibold">{activeConcern.badge}</span>
+                  </div>
                 </div>
-                <h3 className="font-headline font-bold text-xl text-on-surface">
-                  Sub-Millimeter Edge & Pigment Pattern Recognition
-                </h3>
-                <p className="text-body-md text-on-surface-variant max-w-xl leading-relaxed">
-                  Extracts high-resolution morphological parameters: border irregularity, pigment network divergence, and peripheral reticular streaks modeled on dermoscopic criteria.
-                </p>
-              </div>
-              <div className="bg-surface-container p-space-md rounded-xl flex items-center justify-between gap-space-sm text-xs">
-                <div className="flex items-center gap-space-sm">
-                  <span className="material-symbols-outlined text-tertiary">check_circle</span>
-                  <span className="font-medium text-on-surface">Automated Border Irregularity Index</span>
-                </div>
-                <span className="font-headline font-bold bg-surface-container-lowest px-3 py-1 rounded-full text-primary">
-                  0.08 Variance
-                </span>
-              </div>
-            </div>
-
-            {/* Feature 2: Multi-Factor Clinical Logic (5 cols) */}
-            <div className="md:col-span-5 bg-surface-container-lowest rounded-2xl p-space-xl shadow-xs border border-surface-container-high flex flex-col justify-between">
-              <div className="space-y-space-sm mb-space-lg">
-                <div className="inline-flex p-space-sm rounded-xl bg-secondary-container text-on-secondary">
-                  <span className="material-symbols-outlined text-2xl">account_tree</span>
-                </div>
-                <h3 className="font-headline font-bold text-xl text-on-surface">
-                  Multi-Factor Symptom Cross-Check
-                </h3>
-                <p className="text-body-md text-on-surface-variant leading-relaxed">
-                  An isolated image is never enough. The algorithm synthesizes photo patterns with duration, pruritus, bleeding history, and chemical exposures.
-                </p>
-              </div>
-              <div className="flex items-center gap-1 text-secondary font-headline text-xs font-bold">
-                <span>Bayesian Evidence Fusion Active</span>
-                <span className="material-symbols-outlined text-sm">arrow_forward</span>
-              </div>
-            </div>
-
-            {/* Feature 3: Safe Self-Care & What to Avoid (5 cols) */}
-            <div className="md:col-span-5 bg-surface-container-lowest rounded-2xl p-space-xl shadow-xs border border-surface-container-high flex flex-col justify-between">
-              <div className="space-y-space-sm mb-space-lg">
-                <div className="inline-flex p-space-sm rounded-xl bg-tertiary-container text-on-tertiary">
-                  <span className="material-symbols-outlined text-2xl">health_and_safety</span>
-                </div>
-                <h3 className="font-headline font-bold text-xl text-on-surface">
-                  Safe Self-Care & Contraindications
-                </h3>
-                <p className="text-body-md text-on-surface-variant leading-relaxed">
-                  Clear, safe instructions on gentle moisturization and cool compresses, alongside explicit warnings against dangerous home removals or unsupervised OTC steroids.
-                </p>
-              </div>
-              <div className="bg-surface-container-low px-space-md py-2 rounded-lg text-on-surface-variant text-xs flex items-center gap-1.5 font-medium">
-                <span className="material-symbols-outlined text-sm text-tertiary">check</span>
-                Evidence-based nursing protocols
-              </div>
-            </div>
-
-            {/* Feature 4: Physician Referral Pack (7 cols) */}
-            <div className="md:col-span-7 bg-surface-container-lowest rounded-2xl p-space-xl shadow-xs border border-surface-container-high flex flex-col justify-between">
-              <div className="space-y-space-sm mb-space-lg">
-                <div className="inline-flex p-space-sm rounded-xl bg-surface-container-high text-primary">
-                  <span className="material-symbols-outlined text-2xl">send_to_mobile</span>
-                </div>
-                <h3 className="font-headline font-bold text-xl text-on-surface">
-                  One-Click Doctor Referral PDF Export
-                </h3>
-                <p className="text-body-md text-on-surface-variant max-w-xl leading-relaxed">
-                  Export standardized clinical dossiers ready for telehealth visits or in-person dermatology appointments, complete with timestamps and symptom timelines.
-                </p>
-              </div>
-              <div className="flex items-center justify-between flex-wrap gap-space-sm pt-space-xs text-xs">
-                <div className="flex items-center gap-1 text-on-surface-variant font-medium">
-                  <span className="material-symbols-outlined text-primary text-base">picture_as_pdf</span>
-                  Standard HL7 / FHIR compatible formatting
-                </div>
-                <Link
-                  href="/referral"
-                  className="bg-surface-container hover:bg-surface-container-high text-on-surface px-4 py-2 rounded-lg font-headline font-semibold transition-colors"
+                <button
+                  onClick={() => setActiveConcern(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center"
                 >
-                  Doctor Network
+                  <span className="material-symbols-outlined text-base">close</span>
+                </button>
+              </div>
+
+              <div className="py-4 space-y-3 text-xs text-[#526373] leading-relaxed">
+                <div>
+                  <h4 className="font-bold text-[#1c2834] uppercase tracking-wider text-[10px] mb-1">Clinical Overview</h4>
+                  <p>{activeConcern.description}</p>
+                </div>
+                <div>
+                  <h4 className="font-bold text-[#1c2834] uppercase tracking-wider text-[10px] mb-1">Presentation & Management</h4>
+                  <p>{activeConcern.clinicalContext}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-[#eef7fa] border border-[#cde5ee] text-[11px] text-[#2c4756]">
+                  <strong>Medical Disclaimer:</strong> This description is provided strictly for educational purposes and does not represent an automated diagnosis for any personal presentation.
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                <button
+                  onClick={() => setActiveConcern(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Close
+                </button>
+                <Link
+                  href="/assess"
+                  className="px-5 py-2 rounded-xl bg-[#4da8b9] hover:bg-[#3a96a7] text-white text-xs font-bold shadow-xs"
+                >
+                  Analyze My Presentation
                 </Link>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </section>
 
-      {/* 6. Ethical AI Commitment Banner */}
-      <section className="w-full py-space-xl">
-        <div className="max-w-7xl mx-auto px-gutter">
-          <div className="bg-surface-container-lowest rounded-3xl p-space-xl shadow-md border-l-4 border-l-primary border border-surface-container-high flex flex-col lg:flex-row items-center justify-between gap-space-xl">
-            <div className="space-y-space-sm max-w-3xl">
-              <div className="flex items-center gap-space-xs text-primary font-headline text-xs uppercase tracking-wider font-bold">
-                <span className="material-symbols-outlined text-base">gavel</span>
-                <span>Ethical Artificial Intelligence Commitment</span>
-              </div>
-              <h2 className="font-headline font-bold text-xl sm:text-2xl text-on-surface leading-snug">
-                &ldquo;AI does not replace a medical professional. Our engine identifies visual patterns and triage urgency to help you decide when to seek clinical care.&rdquo;
+      {/* =========================================================================
+          FEATURED AI CAPABILITIES (Replaces "Featured Services" Horizontal Carousel)
+          ========================================================================= */}
+      <section className="py-12 sm:py-16 bg-gradient-to-b from-[#e8f4f8] via-[#e2eff4] to-[#e8f4f8]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="font-headline text-2xl sm:text-3xl font-extrabold text-[#1c2834] tracking-tight">
+                Featured AI Capabilities
               </h2>
-              <p className="text-body-md text-on-surface-variant leading-relaxed">
-                SkinWise AI operates strictly as an informational decision-support and symptom triage companion. We continually calibrate false-negative thresholds toward excessive safety.
+              <p className="text-xs sm:text-sm text-[#526373] mt-1">
+                Advanced clinical vision modules engineered for dermatological decision support.
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row lg:flex-col gap-space-sm w-full lg:w-auto shrink-0">
-              <Link
-                href="/assess"
-                className="inline-flex items-center justify-center gap-space-xs bg-primary hover:bg-secondary text-on-primary px-space-lg py-3 rounded-xl font-headline text-label-md font-semibold transition-colors text-center shadow-xs"
+
+            {/* Carousel Navigation Arrows */}
+            <div className="hidden sm:flex items-center gap-2">
+              <button
+                onClick={() => scrollCarousel("left")}
+                className="w-10 h-10 rounded-full bg-white shadow-xs border border-white/80 hover:bg-[#eef7fa] text-[#1c2834] flex items-center justify-center transition-all"
+                aria-label="Previous Slide"
               >
-                Start Free Assessment
-              </Link>
-              <Link
-                href="/referral"
-                className="inline-flex items-center justify-center gap-space-xs bg-surface-container hover:bg-surface-container-high text-on-surface px-space-lg py-3 rounded-xl font-headline text-label-md font-semibold transition-colors text-center"
+                <span className="material-symbols-outlined text-lg">arrow_back</span>
+              </button>
+              <button
+                onClick={() => scrollCarousel("right")}
+                className="w-10 h-10 rounded-full bg-white shadow-xs border border-white/80 hover:bg-[#eef7fa] text-[#1c2834] flex items-center justify-center transition-all"
+                aria-label="Next Slide"
               >
-                Find In-Network Derm
-              </Link>
+                <span className="material-symbols-outlined text-lg">arrow_forward</span>
+              </button>
             </div>
+          </div>
+
+          {/* Horizontally Scrollable Cards Container showing ~2.5 cards on desktop */}
+          <div
+            ref={carouselRef}
+            className="flex gap-6 overflow-x-auto no-scrollbar scroll-smooth pb-4 pt-1 snap-x snap-mandatory"
+          >
+            {featureCards.map((card, idx) => (
+              <div
+                key={idx}
+                className="min-w-[280px] sm:min-w-[340px] lg:min-w-[380px] bg-white rounded-3xl p-4 sm:p-5 border border-white/90 shadow-med-card hover:shadow-med-card-hover transition-all snap-start flex flex-col justify-between"
+              >
+                <div>
+                  {/* Wide Image with Rounded Corners matching template */}
+                  <div className="rounded-2xl overflow-hidden aspect-[16/10] bg-slate-100 mb-4 border border-slate-100">
+                    <img
+                      src={card.image}
+                      alt={card.title}
+                      className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+
+                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-[#4da8b9] bg-[#eef7fa] px-2.5 py-0.5 rounded-full mb-2">
+                    {card.tag}
+                  </span>
+
+                  <h3 className="font-headline text-base sm:text-lg font-bold text-[#1c2834]">
+                    {card.title}
+                  </h3>
+
+                  <p className="text-xs text-[#526373] mt-2 leading-relaxed">
+                    {card.description}
+                  </p>
+                </div>
+
+                <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span className="text-[11px] font-semibold text-[#526373]">Clinically Audited</span>
+                  <Link
+                    href="/assess"
+                    className="text-[#4da8b9] font-bold hover:underline flex items-center gap-0.5"
+                  >
+                    <span>Launch</span>
+                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* 7. Clinical Clarity FAQ Accordion */}
-      <section className="w-full bg-surface-container-low py-space-xl lg:py-24 border-t border-surface-container-high/60">
-        <div className="max-w-4xl mx-auto px-gutter space-y-space-lg">
-          <div className="text-center space-y-space-xs mb-space-xl">
-            <span className="font-headline text-xs font-bold text-secondary uppercase tracking-widest">
-              Questions & Answers
-            </span>
-            <h2 className="font-headline font-bold text-2xl sm:text-3xl text-on-background">
-              Clinical Clarity & Privacy Answers
+      {/* =========================================================================
+          HOW IT WORKS (Simple 3-Step Clear Section)
+          ========================================================================= */}
+      <section id="how-it-works" className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+        <div className="text-center mb-12">
+          <span className="text-xs font-bold uppercase tracking-widest text-[#4da8b9]">Workflow</span>
+          <h2 className="font-headline text-2xl sm:text-3xl font-extrabold text-[#1c2834] tracking-tight mt-1">
+            How SkinWise AI Works
+          </h2>
+          <p className="text-xs sm:text-sm text-[#526373] mt-2 max-w-lg mx-auto">
+            Three simple, medically structured steps from image intake to clinical next steps.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+          {[
+            {
+              step: "01",
+              title: "Upload a Skin Photo",
+              desc: "Capture or upload a clear dermoscopic photograph. Our optical matrix checks Laplacian focus sharpness, lux lighting, and flash glare in real time.",
+              icon: "add_a_photo",
+            },
+            {
+              step: "02",
+              title: "Answer a Few Questions",
+              desc: "Provide clinical context: anatomical location, symptom duration, itch/pain severity score (0-10), and evaluate critical emergency danger signs.",
+              icon: "quiz",
+            },
+            {
+              step: "03",
+              title: "Receive Insights & Care Steps",
+              desc: "Review supported possible explanations, safe self-care guidance, red-flag warning signs, and export an HL7-aligned clinical dossier for your doctor.",
+              icon: "clinical_notes",
+            },
+          ].map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white rounded-3xl p-7 border border-white/90 shadow-med-card relative flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-5">
+                  <div className="w-12 h-12 rounded-2xl bg-[#eef7fa] text-[#4da8b9] flex items-center justify-center font-bold">
+                    <span className="material-symbols-outlined text-2xl">{item.icon}</span>
+                  </div>
+                  <span className="text-2xl font-black font-headline text-[#cde5ee]">
+                    {item.step}
+                  </span>
+                </div>
+
+                <h3 className="font-headline text-base font-bold text-[#1c2834] mb-2">
+                  {item.title}
+                </h3>
+                <p className="text-xs text-[#526373] leading-relaxed">
+                  {item.desc}
+                </p>
+              </div>
+
+              <div className="mt-6 pt-3 border-t border-slate-100 flex items-center gap-1.5 text-[11px] font-semibold text-[#4da8b9]">
+                <span className="material-symbols-outlined text-sm">check_circle</span>
+                <span>Evidence-Based Protocol</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* =========================================================================
+          RESULTS PREVIEW SECTION (Interactive Medical Output HUD)
+          ========================================================================= */}
+      <section className="py-14 sm:py-20 bg-gradient-to-b from-[#e8f4f8] via-[#e2eff4] to-[#e8f4f8]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#4da8b9]">Clinical Output Preview</span>
+            <h2 className="font-headline text-2xl sm:text-3xl font-extrabold text-[#1c2834] tracking-tight mt-1">
+              Structured Clinical Findings Preview
             </h2>
-            <p className="text-body-md text-on-surface-variant leading-relaxed">
-              Everything you need to know about our triage technology, clinical scope, and privacy pledges.
+            <p className="text-xs sm:text-sm text-[#526373] mt-2 max-w-xl mx-auto">
+              Inspect how the application organizes possible explanations, uncertainty factors, safe self-care, and referral pathways.
             </p>
+
+            {/* Preview State Toggle */}
+            <div className="inline-flex items-center bg-white rounded-full p-1 border border-[#cde5ee] mt-5 shadow-xs">
+              <button
+                onClick={() => setPreviewMode("standard")}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  previewMode === "standard"
+                    ? "bg-[#4da8b9] text-white shadow-xs"
+                    : "text-[#526373] hover:text-[#1c2834]"
+                }`}
+              >
+                Standard Triage
+              </button>
+              <button
+                onClick={() => setPreviewMode("inconclusive")}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  previewMode === "inconclusive"
+                    ? "bg-amber-500 text-white shadow-xs"
+                    : "text-[#526373] hover:text-[#1c2834]"
+                }`}
+              >
+                Inconclusive Assessment
+              </button>
+              <button
+                onClick={() => setPreviewMode("urgent")}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  previewMode === "urgent"
+                    ? "bg-[#ba1a1a] text-white shadow-xs"
+                    : "text-[#526373] hover:text-[#1c2834]"
+                }`}
+              >
+                Emergency Escalation
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-space-sm">
-            {faqs.map((faq, i) => {
-              const isOpen = openFaq === i;
-              return (
-                <div
-                  key={i}
-                  className="bg-surface-container-lowest rounded-2xl shadow-xs overflow-hidden border border-surface-container-high transition-all"
-                >
-                  <button
-                    onClick={() => setOpenFaq(isOpen ? null : i)}
-                    className="w-full p-space-md text-left flex items-center justify-between text-on-surface font-headline font-semibold text-base transition-colors hover:bg-surface-container-low"
-                    type="button"
-                  >
-                    <span>{faq.q}</span>
-                    <span
-                      className={`material-symbols-outlined text-primary transform transition-transform duration-200 ${
-                        isOpen ? "rotate-180" : ""
-                      }`}
-                    >
-                      expand_more
-                    </span>
-                  </button>
-                  {isOpen && (
-                    <div className="px-space-md pb-space-md text-on-surface-variant text-body-sm leading-relaxed border-t border-surface-container-high pt-2">
-                      {faq.a}
+          {/* Interactive Mockup HUD */}
+          <div className="bg-white rounded-3xl border border-white/90 shadow-xl overflow-hidden p-6 sm:p-8">
+            
+            {/* Header with Case Code & Triage Chip */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-3">
+              <div>
+                <span className="text-[10px] font-mono text-slate-400 block">ILLUSTRATIVE CASE REF: #DEMO-7042</span>
+                <h3 className="font-headline text-lg font-bold text-[#1c2834]">
+                  {previewMode === "standard" && "Mild Atopic Eczema Presentation"}
+                  {previewMode === "inconclusive" && "Inconclusive Findings — Insufficient Evidence"}
+                  {previewMode === "urgent" && "Emergency Warning Signs Detected"}
+                </h3>
+                <span className="text-xs text-[#526373]">Anatomical Location: Volar Forearm • Duration: 12 days</span>
+              </div>
+
+              <div>
+                {previewMode === "standard" && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>TIER 1 — GENERAL SELF-CARE</span>
+                  </span>
+                )}
+                {previewMode === "inconclusive" && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span>INCONCLUSIVE — CLINICIAN REVIEW NEEDED</span>
+                  </span>
+                )}
+                {previewMode === "urgent" && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-800 border border-rose-200 text-xs font-bold">
+                    <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
+                    <span>TIER 3 — URGENT CARE REQUIRED</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              
+              {/* Evidence & Conditions Column */}
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-[#f7fbfc] border border-[#e1eff4]">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#1c2834] mb-2 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm text-[#4da8b9]">visibility</span>
+                    <span>Possible Explanations (Concordance)</span>
+                  </h4>
+                  
+                  {previewMode === "standard" ? (
+                    <div className="space-y-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-white border border-[#cde5ee] flex justify-between items-center">
+                        <div>
+                          <div className="font-bold text-[#1c2834]">Atopic Dermatitis / Eczema</div>
+                          <div className="text-[11px] text-slate-500">Erythema with xerosis & flexural distribution</div>
+                        </div>
+                        <span className="text-[11px] font-bold text-[#4da8b9] bg-[#eef7fa] px-2 py-0.5 rounded-md">High Visual Fit</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-white border border-[#cde5ee] flex justify-between items-center">
+                        <div>
+                          <div className="font-bold text-[#1c2834]">Contact Dermatitis (Irritant)</div>
+                          <div className="text-[11px] text-slate-500">Demarcated surface scaling</div>
+                        </div>
+                        <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">Moderate Fit</span>
+                      </div>
+                    </div>
+                  ) : previewMode === "inconclusive" ? (
+                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
+                      <strong>Uncertainty Disclosure:</strong> Visual evidence is ambiguous due to low contrast and diffuse margin limits. SkinWise AI will not manufacture a diagnosis when confidence criteria are not met.
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 leading-relaxed">
+                      <strong>Emergency Protocol Active:</strong> Rapidly expanding erythema accompanied by reported systemic symptoms overrides visual classifier suggestions.
                     </div>
                   )}
                 </div>
-              );
-            })}
+
+                {/* Optical & Gaps Indicator */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 text-xs">
+                  <h4 className="font-bold text-[#1c2834] text-xs mb-2">Optical Viability Metrics</h4>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2 rounded-lg bg-slate-50">
+                      <div className="text-[10px] text-slate-500">Sharpness</div>
+                      <div className="font-bold text-[#4da8b9]">94.2 / 100</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-50">
+                      <div className="text-[10px] text-slate-500">Ambient Lux</div>
+                      <div className="font-bold text-[#4da8b9]">Good Illumination</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-50">
+                      <div className="text-[10px] text-slate-500">Glare Ratio</div>
+                      <div className="font-bold text-[#4da8b9]">2.1% (Safe)</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Guidance & Actions Column */}
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-[#f7fbfc] border border-[#e1eff4]">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#1c2834] mb-2 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm text-[#4da8b9]">healing</span>
+                    <span>Safe Next Steps</span>
+                  </h4>
+                  
+                  <ul className="space-y-1.5 text-xs text-[#526373]">
+                    <li className="flex items-start gap-1.5">
+                      <span className="material-symbols-outlined text-sm text-emerald-600 mt-0.5">check</span>
+                      <span>Apply fragrance-free ceramide-rich emollient within 3 minutes after lukewarm bath.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="material-symbols-outlined text-sm text-emerald-600 mt-0.5">check</span>
+                      <span>Avoid harsh surfactants, exfoliants, alcohol-based toners, and hot water.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="material-symbols-outlined text-sm text-[#ba1a1a] mt-0.5">block</span>
+                      <span>Do not scratch or rub lesions; excoriation increases secondary bacterial infection risk.</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 text-xs text-amber-900">
+                  <div className="font-bold flex items-center gap-1 mb-1">
+                    <span className="material-symbols-outlined text-sm text-amber-600">notification_important</span>
+                    <span>Warning Signs to Monitor</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Seek prompt clinical re-evaluation if you notice yellow crusting (honey-colored impetigo signs), rapidly spreading warmth, or localized throbbing pain.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Notice */}
+            <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-[#526373] gap-3">
+              <span>Source Guideline: American Academy of Dermatology (AAD) & DermNet NZ</span>
+              <Link
+                href="/assess"
+                className="inline-flex items-center gap-1.5 text-[#4da8b9] font-bold hover:underline"
+              >
+                <span>Run Your Real Assessment</span>
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          SAFETY AND DOCTOR REFERRAL (3 Organized Levels of Guidance)
+          ========================================================================= */}
+      <section id="safety" className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+        <div className="text-center mb-12">
+          <span className="text-xs font-bold uppercase tracking-widest text-[#4da8b9]">Clinical Safety Protocols</span>
+          <h2 className="font-headline text-2xl sm:text-3xl font-extrabold text-[#1c2834] tracking-tight mt-1">
+            Safety & Care Pathways
+          </h2>
+          <p className="text-xs sm:text-sm text-[#526373] mt-2 max-w-xl mx-auto">
+            SkinWise AI separates patient conditions into three distinct care pathways. Emergency danger signs strictly supersede visual classifier confidence.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* Pathway 1: Mild / General Self-Care */}
+          <div className="bg-white rounded-3xl p-7 border border-white/90 shadow-med-card flex flex-col justify-between">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-5">
+                <span className="material-symbols-outlined text-2xl">eco</span>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
+                Level 1
+              </span>
+              <h3 className="font-headline text-base font-bold text-[#1c2834] mt-2">
+                Mild — General Self-Care
+              </h3>
+              <p className="text-xs text-[#526373] mt-2 leading-relaxed">
+                Appropriate for apparently mild, stable presentations with zero red flags (e.g. minor dry patches, occasional mild acne). Focuses on barrier restoration and watchful monitoring.
+              </p>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-500">
+              Guidance: Conservative non-prescription skincare & monitoring instructions.
+            </div>
+          </div>
+
+          {/* Pathway 2: Doctor Recommended */}
+          <div className="bg-white rounded-3xl p-7 border border-white/90 shadow-med-card flex flex-col justify-between">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-5">
+                <span className="material-symbols-outlined text-2xl">stethoscope</span>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full">
+                Level 2
+              </span>
+              <h3 className="font-headline text-base font-bold text-[#1c2834] mt-2">
+                Medical Assessment Recommended
+              </h3>
+              <p className="text-xs text-[#526373] mt-2 leading-relaxed">
+                Recommended when symptoms persist past 14 days, recurrently worsen, exhibit suspicious mole criteria, or fail to respond to standard conservative care.
+              </p>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-500">
+              Guidance: Consultation with an accredited dermatologist; HL7 PDF dossier export.
+            </div>
+          </div>
+
+          {/* Pathway 3: Urgent / Emergency Attention */}
+          <div className="bg-white rounded-3xl p-7 border border-white/90 shadow-med-card flex flex-col justify-between">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-5">
+                <span className="material-symbols-outlined text-2xl">emergency</span>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full">
+                Level 3
+              </span>
+              <h3 className="font-headline text-base font-bold text-[#1c2834] mt-2">
+                Urgent or Emergency Care
+              </h3>
+              <p className="text-xs text-[#526373] mt-2 leading-relaxed">
+                Immediate clinical escalation for danger signs: facial/lip swelling, respiratory distress, widespread blistering (SJS/TEN), petechiae, or fever with rapidly spreading redness.
+              </p>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-[#ba1a1a] font-semibold">
+              Action: Contact local emergency services (911 / 112 / 999) without delay.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          FINAL CTA SECTION (Rounded Ice-Blue Section)
+          ========================================================================= */}
+      <section className="px-3 sm:px-6 py-8 pb-16">
+        <div className="max-w-5xl mx-auto rounded-4xl sm:rounded-5xl bg-gradient-to-r from-[#d8edf4] via-[#e2f1f7] to-[#d8edf4] border border-white/80 p-8 sm:p-14 text-center shadow-med-card relative overflow-hidden">
+          
+          <div className="max-w-2xl mx-auto space-y-4 relative z-10">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#4da8b9]">Get Started in Minutes</span>
+            
+            <h2 className="font-headline text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#1c2834] tracking-tight">
+              Take the Next Step Toward Understanding Your Skin.
+            </h2>
+
+            <p className="text-xs sm:text-sm text-[#526373] leading-relaxed">
+              Upload a photograph today to receive computer-vision lesion insights, evidence-based conservative care guidance, and doctor-referral advice.
+            </p>
+
+            <div className="pt-3 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/assess"
+                className="bg-[#4da8b9] hover:bg-[#3a96a7] text-white text-sm font-bold px-8 py-3.5 rounded-full shadow-[0_6px_20px_rgba(77,168,185,0.4)] transition-all transform hover:-translate-y-0.5"
+              >
+                Start Skin Assessment
+              </Link>
+              <Link
+                href="/referral"
+                className="bg-white hover:bg-slate-50 text-[#1c2834] text-sm font-bold px-6 py-3.5 rounded-full border border-white/80 shadow-xs"
+              >
+                Find a Dermatologist
+              </Link>
+            </div>
+
+            {/* Privacy & Limits Notice */}
+            <div className="pt-4 text-[11px] text-[#6b7c8d] max-w-xl mx-auto space-y-1">
+              <p>
+                <strong>Privacy Guaranteed:</strong> Zero-Cloud retention mode permanently scrubs raw imagery from disk immediately post-analysis. HIPAA & GDPR patient self-deletion compliant.
+              </p>
+              <p className="text-[10px] text-slate-400">
+                SkinWise AI is an informational symptom assessment aid aligned with CE Class I SaMD guidelines. It does not provide a definitive medical diagnosis.
+              </p>
+            </div>
           </div>
         </div>
       </section>

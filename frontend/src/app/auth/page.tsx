@@ -69,8 +69,8 @@ export default function AuthPage() {
 
   // Demo auto-fill helper for instant evaluation
   const handleDemoFill = () => {
-    setEmail("sarah.patient@skinwise.local");
-    setPassword("ClinicalDemo2026!");
+    setEmail("sarah.jenkins@example.com");
+    setPassword("SkinWise2026!");
     setIsRegister(false);
   };
 
@@ -79,8 +79,8 @@ export default function AuthPage() {
       <div className="bg-surface-container-lowest p-space-lg sm:p-space-xl rounded-3xl shadow-xl border border-surface-container-high space-y-space-md">
         {/* Header */}
         <div className="text-center space-y-1">
-          <div className="w-12 h-12 rounded-2xl bg-primary-container text-on-primary mx-auto flex items-center justify-center font-bold text-xl shadow-sm mb-2">
-            <span className="material-symbols-outlined text-2xl">biotech</span>
+          <div className="w-12 h-12 rounded-2xl bg-[#4da8b9] text-white mx-auto flex items-center justify-center font-bold text-xl shadow-xs mb-2">
+            <span className="material-symbols-outlined text-2xl">dermatology</span>
           </div>
           <h1 className="font-headline font-bold text-2xl text-on-surface">
             {isRegister ? "Create Clinical Account" : "Sign In to SkinWise"}

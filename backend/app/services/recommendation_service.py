@@ -4,166 +4,164 @@ from app.models.schemas import (
 )
 from app.services.vision_engine import SUPPORTED_CONDITIONS
 
-# Source-traceable clinical knowledge repository
+# Source-traceable, conservative health guidance repository
 CLINICAL_KNOWLEDGE_BASE = {
     "eczema_contact_dermatitis": {
-        "title": "Clinical Management of Contact Dermatitis & Eczematous Flare-ups",
-        "publisher": "American Academy of Dermatology (AAD) / British Association of Dermatologists (BAD)",
+        "title": "General Care for Dry, Itchy, or Irritated Skin",
+        "publisher": "Dermatology Educational Guidance",
         "reference_url": "https://www.aad.org/public/diseases/eczema/types/contact-dermatitis",
-        "last_reviewed": "2025-Q3",
-        "approval_status": "Reviewed & Approved by Dermatology Advisory Council",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
         "clinical_summary": (
-            "Contact dermatitis is an acute or subacute inflammatory cutaneous response triggered by exogenous allergen or irritant contact. "
-            "Characterized morphologically by superficial erythema, micropapules, xerosis, and marked pruritus."
+            "Possible visible concern: Red, irritated, or dry skin patches, often associated with a sensitive skin barrier or reaction to contact with an irritant."
         ),
         "safe_self_care": [
-            "Cool Compresses: Apply a clean, cool damp cotton cloth for 10–15 minutes to reduce neuro-sensory itch pathways.",
-            "Barrier Ceramide Emollients: Apply thick, fragrance-free, dye-free moisturizing creams within 3 minutes of bathing.",
-            "Identify & Eliminate Triggers: Immediately discontinue use of recently introduced botanical soaps, fragrances, or topical agents.",
-            "Longitudinal Logging: Photograph the lesion under identical indirect lighting once every 48 hours to track resolution."
+            "Gentle cleansing: Wash with plain lukewarm water or a gentle, fragrance-free, soap-free cleanser. Pat dry gently with a clean towel.",
+            "Moisturize frequently: Apply a plain, fragrance-free moisturizing cream or ointment to help protect the skin barrier.",
+            "Patch testing & allergy care: If trying a new moisturizer, test a small pea-sized amount on your inner forearm first.",
+            "Discontinue if irritated: If any product stings, burns, or worsens redness, rinse it off immediately and discontinue use.",
+            "Cool damp cloth: Place a clean, cool, damp cloth over the area for 5 to 10 minutes to help soothe itching."
         ],
         "what_to_avoid": [
-            "Do NOT Scratch: Disrupting the stratum corneum barrier exponentially increases risk of secondary bacterial impetiginization.",
-            "Avoid Unsupervised OTC Steroids: Topical hydrocortisone can cause rebound flare-ups or mask fungal/viral infections.",
-            "Avoid Hot Water & Essential Oils: Thermal spikes and plant extracts cause direct mast cell degranulation and histamine surge."
+            "Do NOT scratch or rub the area, as this damages the skin barrier and increases the risk of infection.",
+            "Avoid hot showers, harsh scrubs, scented lotions, and products containing strong fragrances or drying alcohol.",
+            "Do NOT apply unprescribed medicated creams without guidance from a doctor."
         ],
         "critical_warning_signs": [
-            "Honey-colored crusting or oozing purulent discharge (Secondary Staph infection).",
-            "Redness spreading rapidly past a drawn pen margin.",
-            "Systemic fever exceeding 100.4°F (38°C) or body chills.",
-            "Severe localized tenderness or throbbing pain."
+            "Yellow or honey-colored crusting, oozing pus, or swelling (signs of secondary infection).",
+            "Redness spreading rapidly or feeling very hot to the touch.",
+            "Fever, chills, or generally feeling unwell.",
+            "Severe pain or rash that does not improve after 7 to 10 days of gentle care."
         ]
     },
     "benign_melanocytic_macule": {
-        "title": "Screening and Triage Guidelines for Pigmented Cutaneous Lesions",
-        "publisher": "DermNet New Zealand / International Dermoscopy Society",
+        "title": "General Guidance for Common Skin Spots & Moles",
+        "publisher": "Dermatology Educational Guidance",
         "reference_url": "https://dermnetnz.org/topics/melanocytic-naevus",
-        "last_reviewed": "2025-Q2",
-        "approval_status": "Reviewed & Approved by Dermatology Advisory Council",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
         "clinical_summary": (
-            "Melanocytic nevi are common benign proliferations of pigment-producing melanocytes. "
-            "Typically display symmetric contours, well-demarcated uniform borders, and homogeneous pigment networks."
+            "Possible visible concern: A stable, uniform spot or mole with even borders and consistent color."
         ),
         "safe_self_care": [
-            "Broad-Spectrum Photoprotection: Apply SPF 50+ mineral sunscreen daily to prevent UV-induced melanocytic mutations.",
-            "Regular ABCDE Self-Examination: Inspect for changes in Asymmetry, Border, Color, Diameter (>6mm), and Evolution monthly.",
-            "Baseline Photo Documentation: Retain calibrated baseline macro photos for annual specialist dermatological comparison."
+            "Daily sun protection: Apply broad-spectrum sunscreen (SPF 30 or higher) daily to exposed skin.",
+            "Routine self-checks: Check your skin once a month for any new, growing, or changing spots.",
+            "Take reference photos: Take a clear photo every few months to help a doctor compare if you ever notice changes.",
+            "Discontinue irritating topicals: If friction or clothing irritates the spot, protect it gently with a breathable bandage."
         ],
         "what_to_avoid": [
-            "Do NOT Attempt Home Mole Removal: Chemical peels, apple cider vinegar, or caustic pastes cause severe scarring and obscure histopathology.",
-            "Avoid Friction & Trauma: Prevent chronic rubbing from rough clothing seams or jewelry against the lesion surface.",
-            "Avoid Tanning Beds: Artificial UV exposure increases melanoma risk substantially."
+            "NEVER attempt to scratch, cut, burn, or remove a mole at home with tools, acids, or home remedies.",
+            "Avoid tanning beds and sunburns, which increase long-term skin damage.",
+            "Do not ignore gradual changes in shape, border, or color."
         ],
         "critical_warning_signs": [
-            "Rapid spontaneous bleeding without prior mechanical trauma.",
-            "Development of new satellite pigment spots around the border.",
-            "Sudden loss of symmetry, border scalloping, or multi-color variegation (shades of black, red, or white).",
-            "Persistent ulceration or localized pain."
+            "A spot that bleeds, oozes, or scabs without being scratched or injured.",
+            "A spot that changes noticeably in shape, border asymmetry, color variation, or size.",
+            "A spot that feels noticeably itchy, tender, or painful for more than two weeks."
         ]
     },
     "suspicious_dysplastic_lesion": {
-        "title": "Atypical Pigmented Lesion Clinical Evaluation Protocol",
-        "publisher": "National Comprehensive Cancer Network (NCCN) / AAD Guidelines",
-        "reference_url": "https://www.nccn.org/patients/guidelines/content/PDF/melanoma-patient.pdf",
-        "last_reviewed": "2025-Q4",
-        "approval_status": "Reviewed & Approved by Dermatology Advisory Council",
+        "title": "Guidance on Spots with Irregular Borders or Color",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.aad.org/public/diseases/skin-cancer/find/atypical-moles",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
         "clinical_summary": (
-            "Atypical dysplastic lesions exhibit structural asymmetry, border scalloping, or pigment variegation. "
-            "Definitive benign vs. malignant differentiation CANNOT be achieved via 2D consumer photography and strictly requires polarized dermoscopy and histopathological biopsy."
+            "Possible visible concern: A spot showing some uneven shape, varied color, or irregular edges. Photographs cannot confirm what this is; an in-person doctor check is recommended."
         ),
         "safe_self_care": [
-            "Prompt Specialist Referral: Schedule an urgent dermoscopic exam with a board-certified dermatologist within 1–2 weeks.",
-            "Preserve Lesion Architecture: Keep the area clean, protected, and free from topical irritants until clinical review.",
-            "Document Timeline: Record when the spot was first noticed and any changes in elevation, diameter, or color."
+            "Schedule a doctor check: Arrange an in-person appointment with a qualified doctor or dermatologist for a physical skin examination.",
+            "Protect from sun and friction: Keep the area covered or apply sunscreen; avoid rough clothing friction.",
+            "Keep clean and undisturbed: Wash gently with mild soap and water without rubbing or picking."
         ],
         "what_to_avoid": [
-            "Do NOT Delay Clinical Evaluation: Early surgical excision of dysplastic lesions carries an excellent prognosis.",
-            "Do NOT Scratch, Pick, or Scrape: Mechanical trauma disrupts architectural clues needed during biopsy.",
-            "Do NOT Rely on Reassurance Apps Alone: Automated tools cannot palpate or biopsy tissue."
+            "Do NOT delay an in-person medical evaluation. Automated photo analysis cannot diagnose skin lesions.",
+            "Do NOT scratch, pick, or apply harsh chemical solutions to the spot.",
+            "Do not rely solely on mobile app feedback for changing or atypical spots."
         ],
         "critical_warning_signs": [
-            "Spontaneous bleeding, ulceration, or crusting.",
-            "Rapid increase in size (> 2mm in a few weeks).",
-            "Elevation change from macular flat to nodular palpable.",
-            "Regional lymph node swelling."
+            "Spontaneous bleeding, crusting, or ulceration.",
+            "Noticeable growth or elevation change within a few weeks.",
+            "New dark spots forming around the perimeter."
         ]
     },
     "psoriasis": {
-        "title": "Standard Clinical Guidance for Plaque Psoriasis",
-        "publisher": "National Psoriasis Foundation / BAD Guidelines",
+        "title": "General Care for Thick, Scaly, or Red Patches",
+        "publisher": "Dermatology Educational Guidance",
         "reference_url": "https://www.psoriasis.org/about-psoriasis/",
-        "last_reviewed": "2025-Q3",
-        "approval_status": "Reviewed & Approved by Dermatology Advisory Council",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
         "clinical_summary": (
-            "Plaque psoriasis is a chronic immune-mediated hyperproliferative epidermal disease. "
-            "Presents with sharply demarcated salmon-pink plaques capped with silvery-white adherent scales."
+            "Possible visible concern: Well-defined red patches with surface scaling. A medical examination is needed for diagnosis and targeted treatment plans."
         ),
         "safe_self_care": [
-            "Emollient Therapy: Use heavy keratolytics (e.g., creams containing urea or salicylic acid) to soften plaques.",
-            "Lukewarm Baths: Soak for 10 minutes in colloidal oatmeal; pat dry gently without aggressive friction.",
-            "Gentle Sun Exposure: Brief 10-minute non-burning natural sunlight exposures under medical guidance."
+            "Generous moisturizing: Apply thick, fragrance-free moisturizing ointments or creams right after washing to lock in hydration.",
+            "Short lukewarm baths: Bathe in warm (not hot) water for 10 minutes to help soothe tightness; pat dry gently.",
+            "Patch test new skincare: Test any new moisturizer on a small patch of skin first; stop using it if stinging or redness develops.",
+            "See a healthcare provider: A doctor can evaluate whether prescription treatment is needed."
         ],
         "what_to_avoid": [
-            "Avoid Koebner Phenomenon: Physical trauma, scratches, or sunburns can trigger new psoriasis plaques at the injury site.",
-            "Avoid Abrupt Steroid Cessation: Stopping high-potency topical or oral steroids abruptly can cause pustular rebound flares.",
-            "Avoid Smoking & Excessive Alcohol: Both significantly aggravate systemic psoriatic inflammation."
+            "Do NOT aggressively pick, peel, or scratch scales, which can cause bleeding and worsen the skin barrier.",
+            "Avoid harsh soaps, alcohol-based astringents, and abrasive sponges.",
+            "Avoid very hot showers or baths that strip natural skin oils."
         ],
         "critical_warning_signs": [
-            "Generalized skin redness covering > 80% of body surface (Erythrodermic emergency).",
-            "Onset of multiple small pustules with fever (Generalized pustular psoriasis).",
-            "Joint swelling, morning stiffness, or sausage-digit dactylitis (Psoriatic arthritis)."
+            "Widespread redness spreading across large parts of the body.",
+            "Fever, chills, or pus-filled blisters forming.",
+            "Joint pain, stiffness, or swelling accompanying skin symptoms."
         ]
     },
     "fungal_tinea": {
-        "title": "Evidence-Based Management of Superficial Dermatophytosis",
-        "publisher": "British Association of Dermatologists (BAD) / CDC Fungal Diseases",
+        "title": "General Care for Circular or Ring-Shaped Rashes",
+        "publisher": "Dermatology Educational Guidance",
         "reference_url": "https://www.cdc.gov/fungal/diseases/ringworm/index.html",
-        "last_reviewed": "2025-Q1",
-        "approval_status": "Reviewed & Approved by Dermatology Advisory Council",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
         "clinical_summary": (
-            "Dermatophytosis (Tinea) is a keratinophilic superficial fungal infection characterized by expanding annular plaques "
-            "with active erythematous scaling margins and central clearing."
+            "Possible visible concern: An expanding red, ring-shaped rash with clearer center. An in-person doctor check can confirm the cause and recommend appropriate care."
         ),
         "safe_self_care": [
-            "Keep Skin Clean & Dry: Fungi proliferate rapidly in warm, moist cutaneous folds.",
-            "Wash Clothing & Towels in Hot Water: Use separate towels to prevent transmission to other body sites or household members.",
-            "Wear Breathable Fabrics: Loose cotton clothing minimizes moisture build-up."
+            "Keep the area clean and dry: Gently wash with mild soap and dry thoroughly with a clean, dry towel.",
+            "Use dedicated towels: Use a separate towel for the affected area and wash clothing in warm water to avoid spreading.",
+            "Wear breathable clothing: Loose, light cotton fabrics help reduce moisture and heat buildup.",
+            "Check with a doctor: Consult a healthcare professional if you suspect a fungal infection for appropriate guidance."
         ],
         "what_to_avoid": [
-            "STRICT CONTRAINDICATION - Do NOT Apply Topical Corticosteroids: Hydrocortisone produces 'Tinea Incognito', fueling aggressive fungal replication.",
-            "Avoid Sharing Personal Items: Razors, brushes, gym mats, and unwashed clothing spread spores.",
-            "Avoid Tight Synthetic Garments: Traps sweat and accelerates fungal growth."
+            "Do NOT apply steroid creams (like hydrocortisone) unless directed by a doctor, as steroids can worsen fungal rashes.",
+            "Avoid sharing personal towels, clothing, or grooming items with others.",
+            "Avoid tight synthetic garments that trap sweat and moisture."
         ],
         "critical_warning_signs": [
-            "Rapid peripheral spread with maceration and blistering.",
-            "Signs of secondary cellulitis (heat, severe swelling, ascending red streaks).",
-            "Lack of improvement after 14 days of compliant antifungal care."
+            "Rapid spread of the rash or severe swelling.",
+            "Skin becoming hot, tender, or developing red streaks (signs of bacterial infection).",
+            "Rash that does not improve after 10 to 14 days."
         ]
     },
     "acne_vulgaris": {
-        "title": "Clinical Guidelines for the Management of Acne Vulgaris",
-        "publisher": "American Academy of Dermatology (AAD)",
-        "reference_url": "https://www.aad.org/member/clinical-quality/guidelines/acne",
-        "last_reviewed": "2025-Q2",
-        "approval_status": "Reviewed & Approved by Dermatology Advisory Council",
+        "title": "General Care for Blemishes, Pimples, or Clogged Pores",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.aad.org/public/diseases/acne",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
         "clinical_summary": (
-            "Acne vulgaris is a multifactorial disorder of the pilosebaceous unit involving follicular hyperkeratinization, "
-            "microbial colonization by Cutibacterium acnes, and localized inflammation."
+            "Possible visible concern: Small red bumps, whiteheads, or blackheads associated with excess oil and blocked pores."
         ),
         "safe_self_care": [
-            "Non-Comedogenic Cleansing: Wash twice daily with gentle, pH-balanced non-comedogenic foaming cleanser.",
-            "Over-the-counter Benzoyl Peroxide / Salicylic Acid: Helps reduce bacterial load and follicular plugging.",
-            "Oil-Free Hydration: Use light, oil-free water-based hydration to maintain barrier stability."
+            "Gentle daily washing: Wash twice daily with a mild, non-soap facial cleanser and lukewarm water.",
+            "Light, non-comedogenic hydration: Use an oil-free, fragrance-free moisturizer that won't clog pores.",
+            "Daily sun protection: Protect skin with an oil-free, non-greasy sunscreen (SPF 30+).",
+            "Patch test new products: Test new skincare on a small area first; stop immediately if burning or rash develops.",
+            "Consult a clinician: If blemishes are deep, painful, or causing scarring, visit a healthcare provider for personalized treatment."
         ],
         "what_to_avoid": [
-            "Do NOT Squeeze or Pop Lesions: Causes deep dermal rupture, post-inflammatory hyperpigmentation, and ice-pick scarring.",
-            "Avoid Abrasive Scrubs: Physical loofahs or walnut scrubs exacerbate follicular wall inflammation.",
-            "Avoid Occlusive Heavy Oils: Coconut oil and mineral waxes clog pores."
+            "Do NOT squeeze, pick, or pop blemishes, which pushes inflammation deeper and causes scarring.",
+            "Avoid abrasive scrubs, stiff brushes, and astringents that dry out and irritate the skin.",
+            "Avoid heavy, greasy oils and hair products that can transfer to skin and clog pores."
         ],
         "critical_warning_signs": [
-            "Deep painful fluctuating cystic nodules (Nodulocystic acne requiring oral isotretinoin).",
-            "Fever, joint pain, and ulcerated crusting lesions (Acne fulminans emergency).",
-            "Severe facial swelling."
+            "Deep, painful, hard lumps or cysts under the skin.",
+            "Severe facial swelling or fever accompanying skin breakout.",
+            "Significant emotional distress or scarring from skin breakouts."
         ]
     }
 }
@@ -171,8 +169,8 @@ CLINICAL_KNOWLEDGE_BASE = {
 
 class RecommendationEngine:
     """
-    Multimodal Evidence Integration & Recommendation Generator.
-    Correlates image computer-vision findings with reported questionnaire symptoms.
+    Multimodal Evidence Integration & Plain-Language Recommendation Generator.
+    Correlates image observations with reported symptoms honestly without clinical certainty claims.
     """
 
     @classmethod
@@ -182,52 +180,49 @@ class RecommendationEngine:
         visual_findings: Dict[str, Any]
     ) -> List[ConditionMatchModel]:
         """
-        Bayesian-weighted correlation of visual probabilities + user reported context.
+        Integrates visual observation with user symptoms into non-diagnostic 'possible visible concerns'.
         """
         probs = visual_findings.get("calibrated_probabilities", {})
         morphology = visual_findings.get("morphological_features", {})
         asym = morphology.get("asymmetry_score", 0.0)
         border = morphology.get("border_irregularity", 0.0)
-        erythema = morphology.get("erythema_saturation", 0.0)
 
         matches: List[ConditionMatchModel] = []
 
-        # 1. Evaluate Eczema / Contact Dermatitis
+        # 1. Eczema / Contact Irritation
         eczema_prob = probs.get("eczema_contact_dermatitis", 0.15)
-        # Boost if patient reported exogenous chemical exposure and high itch
         if symptoms.prior_chemical_exposure:
             eczema_prob += 0.25
         if symptoms.itch_score >= 6:
             eczema_prob += 0.15
-        
-        # 2. Evaluate Dysplasia / Malignancy Risk
+
+        # 2. Dysplasia / Atypical Lesion
         dysplasia_prob = probs.get("suspicious_dysplastic_lesion", 0.10)
         if symptoms.bleeding_or_crusting:
             dysplasia_prob += 0.20
         if symptoms.is_spreading and symptoms.duration_days > 30:
             dysplasia_prob += 0.15
 
-        # 3. Evaluate Benign Macule
+        # 3. Common Mole / Macule
         benign_prob = probs.get("benign_melanocytic_macule", 0.15)
         if asym < 0.15 and border < 0.20 and symptoms.itch_score == 0 and not symptoms.is_spreading:
             benign_prob += 0.25
 
-        # 4. Evaluate Psoriasis
+        # 4. Scaly Plaque / Psoriasis pattern
         psoriasis_prob = probs.get("psoriasis", 0.10)
         if "psoriasis" in (symptoms.personal_skin_history or "").lower():
             psoriasis_prob += 0.30
 
-        # 5. Evaluate Fungal Tinea
+        # 5. Ring-shaped / Fungal pattern
         fungal_prob = probs.get("fungal_tinea", 0.10)
         if border > 0.25 and symptoms.itch_score >= 4 and not symptoms.prior_chemical_exposure:
             fungal_prob += 0.15
 
-        # 6. Evaluate Acne
+        # 6. Acne / Blemishes
         acne_prob = probs.get("acne_vulgaris", 0.10)
         if "face" in symptoms.anatomical_region.lower() or "chest" in symptoms.anatomical_region.lower():
             acne_prob += 0.20
 
-        # Combine weighted list
         weighted = [
             ("eczema_contact_dermatitis", eczema_prob),
             ("suspicious_dysplastic_lesion", dysplasia_prob),
@@ -238,41 +233,40 @@ class RecommendationEngine:
         ]
         weighted.sort(key=lambda x: x[1], reverse=True)
 
-        # Generate top matches with clear source traceability
-        for rank, (cond_key, score) in enumerate(weighted[:3]):
+        for rank, (cond_key, _) in enumerate(weighted[:3]):
             kb_data = CLINICAL_KNOWLEDGE_BASE.get(cond_key, {})
             cond_meta = SUPPORTED_CONDITIONS.get(cond_key, {})
-            
-            concordance = "Primary Pattern Match" if rank == 0 else ("Secondary Pattern Match" if rank == 1 else "Possible Consideration")
-            
+
+            concordance = "Primary pattern consideration" if rank == 0 else "Other possible consideration"
+
             if cond_key == "eczema_contact_dermatitis":
-                visual_overlap = "Micro-papules, erythema, fine superficial desquamation"
-                history_corr = f"Correlates with reported itch ({symptoms.itch_score}/10) and exposure to: {symptoms.exposure_details or 'exogenous irritant'}"
+                visual_overlap = "Visible redness, dry texture, or surface irritation"
+                history_corr = f"Reported itch: {symptoms.itch_score}/10"
             elif cond_key == "benign_melanocytic_macule":
-                visual_overlap = "Symmetric regular borders, uniform pigment distribution"
-                history_corr = f"Stable presentation without rapid evolution ({symptoms.duration_days} days reported)"
+                visual_overlap = "Even border outline and consistent pigment"
+                history_corr = f"Reported stable duration of ~{symptoms.duration_days} days"
             elif cond_key == "suspicious_dysplastic_lesion":
-                visual_overlap = f"Asymmetry score {asym}, border irregularity {border}"
-                history_corr = "Requires dermatoscopic differentiation and tissue biopsy"
+                visual_overlap = "Uneven contour or varied coloring observed in image"
+                history_corr = "Requires an in-person physical examination by a doctor"
             elif cond_key == "psoriasis":
-                visual_overlap = "Well-demarcated erythematous plaque morphology"
-                history_corr = "Subacute onset across extensor surface"
+                visual_overlap = "Distinct reddish skin area with surface scaling"
+                history_corr = f"Reported duration of {symptoms.duration_days} days"
             elif cond_key == "fungal_tinea":
-                visual_overlap = "Annular peripheral scaling margin with clearer central zone"
-                history_corr = f"Progressive margin spread reported over {symptoms.duration_days} days"
+                visual_overlap = "Curved or circular reddish margin observed"
+                history_corr = "Gradual spread reported by user"
             else:
-                visual_overlap = "Follicular inflammatory papules"
-                history_corr = "Anatomical distribution consistent with pilosebaceous gland density"
+                visual_overlap = "Small localized bumps or blemishes"
+                history_corr = "Location consistent with oil-producing skin areas"
 
             matches.append(ConditionMatchModel(
                 condition_id=cond_key,
                 name=cond_meta.get("name", kb_data.get("title", cond_key)),
-                category=cond_meta.get("category", "Dermatological Condition"),
+                category=cond_meta.get("category", "Visible Skin Pattern"),
                 concordance_tier=concordance,
                 visual_overlap=visual_overlap,
                 clinical_history_correlation=history_corr,
                 summary=kb_data.get("clinical_summary", ""),
-                publisher_source=kb_data.get("publisher", "Clinical Review Board"),
+                publisher_source=kb_data.get("publisher", "Dermatology Educational Guidance"),
                 source_url=kb_data.get("reference_url", "https://www.aad.org")
             ))
 
@@ -287,35 +281,30 @@ class RecommendationEngine:
         is_quality_acceptable: bool
     ) -> TriageResultModel:
         """
-        Assembles complete source-traceable clinical decision support.
+        Assembles clean, conservative decision support in plain language.
         """
-        # Diagnostic gaps declaration (MANDATORY clinical boundary disclosure)
         diagnostic_gaps = [
-            "No Tactile Palpation: 2D consumer photography cannot assess deep dermal induration, firmness, or localized heat.",
-            "Polarized Dermoscopy Missing: Sub-surface vascular capillary loops and deep melanin patterns cannot be examined without hardware dermatoscope optics.",
-            "Biopsy and Patch Testing Required: Histological verification by a certified dermatopathologist is the gold standard for definitive diagnosis."
+            "Photos have limitations: A 2D photo cannot feel the skin texture, thickness, or temperature.",
+            "Doctor visit needed for diagnosis: Only a qualified healthcare provider can perform an in-person examination and provide a medical diagnosis.",
+            "Informational guidance only: This tool does not provide medical treatment, prescriptions, or laboratory tests."
         ]
 
         if not is_quality_acceptable:
-            diagnostic_gaps.insert(0, "Optical Viability Insufficient: Blurry image or suboptimal lighting limits feature segmentation reliability.")
+            diagnostic_gaps.insert(0, "Photo quality notice: The photo was slightly blurry or had uneven lighting, which limits how well visible features can be compared.")
 
-        # Inconclusive check
         uncertainty = visual_findings.get("uncertainty_metrics", {})
         is_inconclusive = (not is_quality_acceptable) or uncertainty.get("is_out_of_distribution", False)
         inconclusive_reason = None
         if not is_quality_acceptable:
-            inconclusive_reason = "Image quality did not pass focus or lighting thresholds. Re-take photo or consult a doctor."
+            inconclusive_reason = "The photo was unclear or lighting was insufficient. Please retake the photo in natural light or see a doctor."
         elif uncertainty.get("is_out_of_distribution", False):
-            inconclusive_reason = "Cutaneous pattern exhibits high ambiguity or falls outside validated model domain."
+            inconclusive_reason = "The visible features did not clearly match known reference patterns. An in-person doctor check is recommended."
 
-        # Multimodal evidence matches
         possible_conditions = cls.synthesize_multimodal_evidence(symptoms, visual_findings)
         primary_match_key = possible_conditions[0].condition_id if possible_conditions else "eczema_contact_dermatitis"
-        
-        # Primary guidance retrieved from approved source
+
         primary_kb = CLINICAL_KNOWLEDGE_BASE.get(primary_match_key, CLINICAL_KNOWLEDGE_BASE["eczema_contact_dermatitis"])
-        
-        # Citations list
+
         citations = []
         for cond in possible_conditions:
             kb = CLINICAL_KNOWLEDGE_BASE.get(cond.condition_id)
@@ -333,7 +322,7 @@ class RecommendationEngine:
             triage_name=triage_pathway["triage_name"],
             recommended_timeline=triage_pathway["recommended_timeline"],
             urgency_badge_color=triage_pathway["urgency_badge_color"],
-            primary_condition=possible_conditions[0].name if possible_conditions else "Dermatological Symptom Pattern",
+            primary_condition=possible_conditions[0].name if possible_conditions else "Visible Skin Concern",
             rationale=triage_pathway["rationale"],
             emergency_warning_detected=triage_pathway.get("emergency_warning_detected", False),
             emergency_warning_items=triage_pathway.get("emergency_warning_items", []),
@@ -348,4 +337,3 @@ class RecommendationEngine:
         )
 
 recommendation_engine = RecommendationEngine()
-

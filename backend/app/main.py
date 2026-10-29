@@ -192,7 +192,9 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="Clinical Decision Support & Dermatological Symptom Triage Web Platform",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url=f"{settings.API_V1_STR}/docs",
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
 # CORS Middleware configuration
@@ -211,11 +213,12 @@ app.include_router(assessments.router, prefix=settings.API_V1_STR)
 app.include_router(knowledge.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
+@app.get(settings.API_V1_STR)
 def root():
     return {
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "docs_url": "/docs",
+        "docs_url": f"{settings.API_V1_STR}/docs",
         "health_check": f"{settings.API_V1_STR}/health"
     }
 

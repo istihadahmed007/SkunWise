@@ -1,4 +1,29 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+/**
+ * SkinWise AI Typed API Client
+ * Dynamically resolves base URL from:
+ * 1. BACKEND_URL (internal service binding injected by Vercel Services at runtime)
+ * 2. NEXT_PUBLIC_API_URL (custom public endpoint override)
+ * 3. "/api" (browser client relative path on unified domain or vercel dev)
+ * 4. "http://127.0.0.1:8000/api" (standalone local development fallback)
+ */
+
+export function getApiBaseUrl(): string {
+  // Runtime binding injected into frontend service by Vercel
+  if (process.env.BACKEND_URL) {
+    const internal = process.env.BACKEND_URL.replace(/\/$/, "");
+    return `${internal}/api`;
+  }
+  // Explicit public environment variable
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+  }
+  // Client-side execution on unified domain (e.g. Vercel deployment with rewrites or vercel dev)
+  if (typeof window !== "undefined") {
+    return "/api";
+  }
+  // Default local standalone development fallback
+  return "http://127.0.0.1:8000/api";
+}
 
 export interface User {
   id: number;
@@ -126,7 +151,8 @@ export const api = {
     consent_biometric: boolean;
     consent_disclaimer: boolean;
   }): Promise<AuthResponse> {
-    const res = await fetch(`${API_BASE_URL}/auth/register`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -139,7 +165,8 @@ export const api = {
   },
 
   async login(data: { email: string; password: string }): Promise<AuthResponse> {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -152,7 +179,8 @@ export const api = {
   },
 
   async getMe(): Promise<User> {
-    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/auth/me`, {
       headers: getAuthHeader(),
     });
     if (!res.ok) {
@@ -166,7 +194,8 @@ export const api = {
     zero_cloud_retention?: boolean;
     data_retention_days?: number;
   }): Promise<User> {
-    const res = await fetch(`${API_BASE_URL}/auth/settings`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/auth/settings`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -181,7 +210,8 @@ export const api = {
   },
 
   async deleteAccount(): Promise<{ status: string; message: string }> {
-    const res = await fetch(`${API_BASE_URL}/auth/account`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/auth/account`, {
       method: "DELETE",
       headers: getAuthHeader(),
     });
@@ -196,12 +226,13 @@ export const api = {
     symptoms: SymptomInput,
     anatomicalRegion: string = "Volar Forearm"
   ): Promise<Assessment> {
+    const base = getApiBaseUrl();
     const formData = new FormData();
     formData.append("file", imageFile, "skin_intake.jpg");
     formData.append("symptoms_json", JSON.stringify(symptoms));
     formData.append("anatomical_region", anatomicalRegion);
 
-    const res = await fetch(`${API_BASE_URL}/skin/analyze`, {
+    const res = await fetch(`${base}/skin/analyze`, {
       method: "POST",
       headers: getAuthHeader(),
       body: formData,
@@ -215,7 +246,8 @@ export const api = {
   },
 
   async getAssessment(id: number | string): Promise<Assessment> {
-    const res = await fetch(`${API_BASE_URL}/skin/assessment/${id}`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/skin/assessment/${id}`, {
       headers: getAuthHeader(),
     });
     if (!res.ok) {
@@ -225,7 +257,8 @@ export const api = {
   },
 
   async getAssessmentHistory(): Promise<AssessmentSummary[]> {
-    const res = await fetch(`${API_BASE_URL}/skin/assessment-history`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/skin/assessment-history`, {
       headers: getAuthHeader(),
     });
     if (!res.ok) {
@@ -235,7 +268,8 @@ export const api = {
   },
 
   async deleteAssessment(id: number | string): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/skin/assessment/${id}`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/skin/assessment/${id}`, {
       method: "DELETE",
       headers: getAuthHeader(),
     });
@@ -245,17 +279,19 @@ export const api = {
   },
 
   getPdfUrl(id: number | string): string {
-    return `${API_BASE_URL}/skin/assessment/${id}/pdf`;
+    const base = getApiBaseUrl();
+    return `${base}/skin/assessment/${id}/pdf`;
   },
 
   getImageUrl(filename: string): string {
     if (filename.startsWith("http")) return filename;
-    return `${API_BASE_URL}/skin/images/${filename}`;
+    const base = getApiBaseUrl();
+    return `${base}/skin/images/${filename}`;
   },
 
   async getHealth() {
-    const res = await fetch(`${API_BASE_URL}/health`);
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/health`);
     return res.json();
   },
 };
-

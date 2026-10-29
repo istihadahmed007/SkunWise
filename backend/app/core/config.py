@@ -4,6 +4,9 @@ from typing import List
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+default_db = "sqlite:////tmp/skinwise.db" if is_serverless else f"sqlite:///{BASE_DIR}/skinwise.db"
+default_storage = Path("/tmp/skinwise_storage") if is_serverless else BASE_DIR / "storage"
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SkinWise AI"
@@ -14,12 +17,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
-    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/skinwise.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", default_db)
     
     # Private Storage configuration
-    STORAGE_DIR: Path = BASE_DIR / "storage"
-    UPLOAD_DIR: Path = BASE_DIR / "storage" / "private_uploads"
-    REPORTS_DIR: Path = BASE_DIR / "storage" / "reports"
+    STORAGE_DIR: Path = Path(os.getenv("STORAGE_DIR", str(default_storage)))
+    UPLOAD_DIR: Path = Path(os.getenv("UPLOAD_DIR", str(default_storage / "private_uploads")))
+    REPORTS_DIR: Path = Path(os.getenv("REPORTS_DIR", str(default_storage / "reports")))
     
     MAX_FILE_SIZE_BYTES: int = 25 * 1024 * 1024  # 25 MB
     ALLOWED_IMAGE_TYPES: List[str] = ["image/jpeg", "image/png", "image/webp"]

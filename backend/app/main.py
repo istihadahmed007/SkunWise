@@ -11,6 +11,14 @@ from app.api import auth, assessments, health, knowledge
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure storage paths exist
+    try:
+        settings.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+        settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        settings.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+
     # Initialize SQLite / PostgreSQL tables
     Base.metadata.create_all(bind=engine)
     

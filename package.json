@@ -1,0 +1,12 @@
+{
+  "name": "skinwise-platform",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend run start"
+  }
+}

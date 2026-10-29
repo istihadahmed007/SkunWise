@@ -1,0 +1,48 @@
+# Python & Virtual Environments
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node.js & Next.js
+frontend/node_modules/
+node_modules/
+frontend/.next/
+.next/
+frontend/out/
+out/
+frontend/build/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment variables & Secrets
+.env
+*.env.local
+!*.env.example
+
+# Database & SQLite storage
+*.db
+*.sqlite
+*.sqlite3
+backend/skinwise.db
+skinwise.db
+
+# Private Storage / Uploaded Medical Images
+backend/storage/private_uploads/*
+backend/storage/reports/*
+!backend/storage/private_uploads/.gitkeep
+!backend/storage/reports/.gitkeep
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

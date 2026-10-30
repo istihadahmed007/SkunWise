@@ -277,6 +277,8 @@ export interface SymptomInput {
   has_breathing_difficulty: boolean;
   has_rapid_blistering_or_peeling: boolean;
   has_petechiae_or_purpura: boolean;
+  consent_biometric: boolean;
+  consent_disclaimer: boolean;
 }
 
 function getAuthHeader(): HeadersInit {
@@ -373,6 +375,8 @@ export const api = {
     formData.append("file", imageFile, "skin_intake.jpg");
     formData.append("symptoms_json", JSON.stringify(symptoms));
     formData.append("anatomical_region", anatomicalRegion);
+    formData.append("consent_biometric", String(Boolean(symptoms.consent_biometric)));
+    formData.append("consent_disclaimer", String(Boolean(symptoms.consent_disclaimer)));
 
     const res = await fetch(`${base}/skin/analyze`, {
       method: "POST",

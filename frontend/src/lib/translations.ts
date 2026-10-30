@@ -87,7 +87,13 @@ export const translations = {
     cosmeticSafetyDesc: "Search reported cosmetic adverse events from the FDA CAERS database. Reports do not establish causation.",
     fdaDisclaimerNote: "FDA Note: Adverse event reports submitted to FDA CAERS do not prove that a product caused the reaction.",
     detectLocationBtn: "Check Local UV",
-    searchProductBtn: "Search FDA Reports"
+    searchProductBtn: "Search FDA Reports",
+    consentSectionTitle: "Mandatory Consent & Declarations",
+    consentBiometricLabel: "Biometric Photo Processing Consent",
+    consentBiometricDesc: "I give explicit affirmative consent for SkinWise AI to analyze my uploaded skin photo for visible pattern comparison. (You can enable immediate photo deletion after analysis in Settings).",
+    consentDisclaimerLabel: "Non-Diagnostic Supportive Notice",
+    consentDisclaimerDesc: "I acknowledge that SkinWise AI provides informational, non-diagnostic guidance and supportive triage only. It does NOT diagnose conditions or prescribe medications. For severe or changing symptoms, I will consult a licensed doctor.",
+    consentRequiredWarning: "Please accept both the photo processing consent and medical non-diagnostic acknowledgment to proceed."
   },
   bn: {
     medicalNotice: "স্কিনওয়াইজ তথ্য ও সাধারণ সচেতনতামূলক পরামর্শ দেয়। এটি কোনো রোগ নির্ণয় করে না এবং ডাক্তারের বিকল্প নয়।",
@@ -175,6 +181,12 @@ export const translations = {
     cosmeticSafetyDesc: "মার্কিন FDA CAERS ডাটাবেস থেকে অনাকাঙ্ক্ষিত প্রতিক্রিয়ার রিপোর্ট অনুসন্ধান করুন। রিপোর্ট সরাসরি কারণ নির্দেশ করে না।",
     fdaDisclaimerNote: "FDA সতর্কতা: অনাকাঙ্ক্ষিত প্রতিক্রিয়ার রিপোর্ট কোনো পণ্য সরাসরি সমস্যার কারণ হিসেবে প্রমাণ করে না।",
     detectLocationBtn: "স্থানীয় UV সূচক দেখুন",
-    searchProductBtn: "FDA রিপোর্ট অনুসন্ধান"
+    searchProductBtn: "FDA রিপোর্ট অনুসন্ধান",
+    consentSectionTitle: "বাধ্যতামূলক সম্মতি ও ঘোষণাপত্র",
+    consentBiometricLabel: "ছবি প্রক্রিয়াকরণে স্পষ্ট সম্মতি",
+    consentBiometricDesc: "আমি স্বয়ংক্রিয় ভিজ্যুয়াল প্যাটার্ন বিশ্লেষণের জন্য আপলোডকৃত ত্বকের ছবি প্রক্রিয়াকরণে স্পষ্ট সম্মতি দিচ্ছি। (সেটিংস থেকে তাৎক্ষণিক ছবি স্থায়ীভাবে মুছে ফেলার সুবিধা রয়েছে)।",
+    consentDisclaimerLabel: "চিকিৎসা সংক্রান্ত সীমাবদ্ধতার স্বীকৃতি",
+    consentDisclaimerDesc: "আমি স্বীকার করছি যে স্কিনওয়াইজ এআই কেবলমাত্র তথ্য ও সহায়ক পরামর্শ দেয়, এটি কোনো চিকিৎসকের বিকল্প বা চূড়ান্ত রোগ নির্ণয় নয়। যেকোনো গুরুতর সমস্যায় আমি সরাসরি চিকিৎসকের পরামর্শ নেব।",
+    consentRequiredWarning: "এগিয়ে যাওয়ার জন্য অনুগ্রহ করে উভয় সম্মতি ও ঘোষণাপত্রে টিক দিন।"
   }
 };

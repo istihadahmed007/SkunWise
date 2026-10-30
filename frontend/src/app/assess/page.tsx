@@ -46,6 +46,11 @@ export default function AssessPage() {
   const [hasBreathingTrouble, setHasBreathingTrouble] = useState<boolean>(false);
   const [hasBlistering, setHasBlistering] = useState<boolean>(false);
 
+  // Mandatory Explicit Consent States
+  const [consentBiometric, setConsentBiometric] = useState<boolean>(false);
+  const [consentDisclaimer, setConsentDisclaimer] = useState<boolean>(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
+
   // Step 3: Loading & submission state
   const [loadingStage, setLoadingStage] = useState<number>(1);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -200,6 +205,16 @@ export default function AssessPage() {
       return;
     }
 
+    if (!consentBiometric || !consentDisclaimer) {
+      setConsentError(
+        language === "bn"
+          ? "এগিয়ে যাওয়ার জন্য অনুগ্রহ করে ছবি প্রক্রিয়াকরণ ও চিকিৎসা সংক্রান্ত স্বীকৃতি উভয়টিতে টিক দিন।"
+          : "Please accept both the photo processing consent and medical non-diagnostic acknowledgment to proceed."
+      );
+      return;
+    }
+    setConsentError(null);
+
     setIsSubmitting(true);
     setCurrentStep(3);
     setLoadingStage(1);
@@ -222,6 +237,8 @@ export default function AssessPage() {
       has_breathing_difficulty: hasBreathingTrouble,
       has_rapid_blistering_or_peeling: hasBlistering,
       has_petechiae_or_purpura: false,
+      consent_biometric: consentBiometric,
+      consent_disclaimer: consentDisclaimer,
     };
 
     try {
@@ -917,6 +934,70 @@ export default function AssessPage() {
               </div>
             </div>
 
+            {/* 8. MANDATORY CONSENT & DISCLAIMER CHECKLIST */}
+            <div className="p-5 rounded-3xl bg-[#f4fafc] border border-[#d8edf3] space-y-3">
+              <div className="flex items-center gap-2 text-[#2b7f8f]">
+                <span className="material-symbols-outlined text-xl">verified_user</span>
+                <h4 className="font-headline font-bold text-xs uppercase tracking-wide">
+                  {t.consentSectionTitle}
+                </h4>
+              </div>
+              <p className="text-xs text-[#526373] leading-relaxed">
+                {language === "bn"
+                  ? "আপনার গোপনীয়তা ও সুরক্ষার জন্য এগিয়ে যাওয়ার পূর্বে উভয় বিষয়ে সম্মতি নিশ্চিত করুন:"
+                  : "Please acknowledge both statements before proceeding to analysis:"}
+              </p>
+
+              {consentError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm shrink-0">error</span>
+                  <span>{consentError}</span>
+                </div>
+              )}
+
+              <div className="space-y-3 text-xs">
+                <label className="flex items-start gap-2.5 cursor-pointer text-[#1c2834]">
+                  <input
+                    type="checkbox"
+                    checked={consentBiometric}
+                    onChange={(e) => {
+                      setConsentBiometric(e.target.checked);
+                      if (e.target.checked && consentDisclaimer) setConsentError(null);
+                    }}
+                    className="rounded text-[#2b7f8f] focus:ring-[#2b7f8f] w-4 h-4 mt-0.5 shrink-0"
+                  />
+                  <div className="space-y-0.5">
+                    <span className="font-bold block text-slate-800">
+                      {t.consentBiometricLabel}
+                    </span>
+                    <span className="text-[#526373] leading-relaxed block text-[11px]">
+                      {t.consentBiometricDesc}
+                    </span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2.5 cursor-pointer text-[#1c2834]">
+                  <input
+                    type="checkbox"
+                    checked={consentDisclaimer}
+                    onChange={(e) => {
+                      setConsentDisclaimer(e.target.checked);
+                      if (e.target.checked && consentBiometric) setConsentError(null);
+                    }}
+                    className="rounded text-[#2b7f8f] focus:ring-[#2b7f8f] w-4 h-4 mt-0.5 shrink-0"
+                  />
+                  <div className="space-y-0.5">
+                    <span className="font-bold block text-slate-800">
+                      {t.consentDisclaimerLabel}
+                    </span>
+                    <span className="text-[#526373] leading-relaxed block text-[11px]">
+                      {t.consentDisclaimerDesc}
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             {/* Back and Submit Actions */}
             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
               <button
@@ -931,7 +1012,8 @@ export default function AssessPage() {
               <button
                 type="button"
                 onClick={submitAssessment}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#4da8b9] hover:bg-[#3a96a7] text-white font-headline text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-98"
+                disabled={isSubmitting || !consentBiometric || !consentDisclaimer}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#4da8b9] hover:bg-[#3a96a7] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-headline text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-98"
               >
                 <span>{language === "bn" ? "ফলাফল দেখুন" : "Check My Skin Concern"}</span>
                 <span className="material-symbols-outlined text-base">arrow_forward</span>

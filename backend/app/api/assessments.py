@@ -35,6 +35,8 @@ async def analyze_skin(
     file: UploadFile = File(..., description="High-resolution clinical dermatological image"),
     symptoms_json: str = Form(..., description="JSON stringified SymptomQuestionnaireInput"),
     anatomical_region: Optional[str] = Form("Volar Forearm"),
+    consent_biometric: Optional[str] = Form(None, description="Explicit affirmative biometric intake consent"),
+    consent_disclaimer: Optional[str] = Form(None, description="Explicit affirmative medical non-diagnostic disclaimer"),
     user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
@@ -55,8 +57,26 @@ async def analyze_skin(
 
     # 1. Parse and validate symptom questionnaire & mandatory consent
     try:
-        symptom_dict = json.loads(symptoms_json)
+        symptom_dict = json.loads(symptoms_json) if symptoms_json else {}
+        if not isinstance(symptom_dict, dict):
+            symptom_dict = {}
+
+        # Populate consent from Form fields if missing in JSON dict
+        if "consent_biometric" not in symptom_dict and consent_biometric is not None:
+            symptom_dict["consent_biometric"] = consent_biometric.lower() in ("true", "1", "yes")
+        if "consent_disclaimer" not in symptom_dict and consent_disclaimer is not None:
+            symptom_dict["consent_disclaimer"] = consent_disclaimer.lower() in ("true", "1", "yes")
+
+        # Friendly explicit validation before internal Pydantic traceback
+        if "consent_biometric" not in symptom_dict or "consent_disclaimer" not in symptom_dict:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mandatory consent missing. Both biometric photo processing consent and non-diagnostic disclaimer acknowledgment must be provided."
+            )
+
         symptoms = SymptomQuestionnaireInput(**symptom_dict)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

@@ -138,6 +138,32 @@ export interface Assessment {
   symptom_data: Record<string, any>;
   triage: TriageResult;
   is_archived: boolean;
+  guest_access_token?: string | null;
+}
+
+export interface Provider {
+  id: string;
+  name: string;
+  department: string;
+  type: string;
+  location: string;
+  division: string;
+  contact_phone: string;
+  opd_hours: string;
+  consultation_fee_bdt: string;
+  services: string[];
+  is_verified: boolean;
+  booking_mode: string;
+  booking_available_online: boolean;
+  notes: string;
+}
+
+export interface ProviderDirectoryResponse {
+  success: boolean;
+  country: string;
+  total_count: number;
+  providers: Provider[];
+  booking_notice: string;
 }
 
 export interface AssessmentSummary {
@@ -152,6 +178,86 @@ export interface AssessmentSummary {
   is_archived: boolean;
   is_inconclusive: boolean;
   urgency_badge_color: string;
+}
+
+export interface UVGuidanceResponse {
+  success: boolean;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  temperature_celsius?: number;
+  current_uv_index: number;
+  max_uv_today: number;
+  risk_tier: string;
+  badge_color: string;
+  summary: string;
+  photoprotection_guidance: string[];
+  recommended_spf: string;
+  licensing_notice: string;
+  attribution: string;
+  source_url: string;
+  message?: string;
+}
+
+export interface CosmeticReportedProduct {
+  name: string;
+  role: string;
+}
+
+export interface CosmeticAdverseEventReport {
+  report_number: string;
+  date_received: string;
+  products: CosmeticReportedProduct[];
+  reported_reactions: string[];
+  outcomes: string[];
+}
+
+export interface CosmeticAdverseEventResponse {
+  success: boolean;
+  query: string;
+  total_reports: number;
+  results: CosmeticAdverseEventReport[];
+  message: string;
+  disclaimer: string;
+  source_url: string;
+}
+
+export interface ModelsStatusResponse {
+  primary_vision_engine: {
+    model_id: string;
+    provider: string;
+    status: string;
+    supports_localization: boolean;
+    bounding_box_format: string;
+    multimodal: boolean;
+  };
+  huggingface_dermatology_engine: {
+    model_id: string;
+    provider: string;
+    architecture: string;
+    pipeline: string;
+    supports_localization: boolean;
+    supports_segmentation: boolean;
+    is_configured: boolean;
+    target_classes_count: number;
+    reference: string;
+  };
+  public_apis: {
+    openfda_cosmetics: {
+      name: string;
+      endpoint: string;
+      status: string;
+      rate_limit: string;
+      terms: string;
+    };
+    open_meteo_uv: {
+      name: string;
+      endpoint: string;
+      status: string;
+      license: string;
+      commercial_subscription_url: string;
+    };
+  };
 }
 
 export interface SymptomInput {
@@ -278,12 +384,18 @@ export const api = {
       const err = await res.json().catch(() => ({ detail: "Skin analysis failed" }));
       throw new Error(err.detail || "Skin analysis failed");
     }
-    return res.json();
+    const data: Assessment = await res.json();
+    if (data.guest_access_token && typeof window !== "undefined") {
+      sessionStorage.setItem(`guest_token_${data.id}`, data.guest_access_token);
+    }
+    return data;
   },
 
-  async getAssessment(id: number | string): Promise<Assessment> {
+  async getAssessment(id: number | string, guestToken?: string): Promise<Assessment> {
     const base = getApiBaseUrl();
-    const res = await fetch(`${base}/skin/assessment/${id}`, {
+    const token = guestToken || (typeof window !== "undefined" ? sessionStorage.getItem(`guest_token_${id}`) : null);
+    const query = token ? `?guest_token=${encodeURIComponent(token)}` : "";
+    const res = await fetch(`${base}/skin/assessment/${id}${query}`, {
       headers: getAuthHeader(),
     });
     if (!res.ok) {
@@ -314,20 +426,86 @@ export const api = {
     }
   },
 
-  getPdfUrl(id: number | string): string {
+  getPdfUrl(id: number | string, guestToken?: string): string {
     const base = getApiBaseUrl();
-    return `${base}/skin/assessment/${id}/pdf`;
+    const token = guestToken || (typeof window !== "undefined" ? sessionStorage.getItem(`guest_token_${id}`) : null);
+    const query = token ? `?guest_token=${encodeURIComponent(token)}` : "";
+    return `${base}/skin/assessment/${id}/pdf${query}`;
   },
 
-  getImageUrl(filename: string): string {
+  getImageUrl(filename: string, guestToken?: string): string {
     if (filename.startsWith("http")) return filename;
     const base = getApiBaseUrl();
-    return `${base}/skin/images/${filename}`;
+    const query = guestToken ? `?guest_token=${encodeURIComponent(guestToken)}` : "";
+    return `${base}/skin/images/${filename}${query}`;
+  },
+
+  async getProviders(division: string = "all", query?: string): Promise<ProviderDirectoryResponse> {
+    const base = getApiBaseUrl();
+    let url = `${base}/referral/providers?division=${encodeURIComponent(division)}`;
+    if (query) {
+      url += `&query=${encodeURIComponent(query)}`;
+    }
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error("Failed to load healthcare provider directory");
+    }
+    return res.json();
+  },
+
+  async withdrawConsent(purgeStoredImages: boolean = true): Promise<{ status: string; message: string }> {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/auth/consent/withdraw?purge_stored_images=${purgeStoredImages}`, {
+      method: "POST",
+      headers: getAuthHeader(),
+    });
+    if (!res.ok) {
+      throw new Error("Failed to withdraw biometric consent");
+    }
+    return res.json();
+  },
+
+  async getConsentHistory(): Promise<any> {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/auth/consent/history`, {
+      headers: getAuthHeader(),
+    });
+    if (!res.ok) {
+      throw new Error("Failed to retrieve consent audit history");
+    }
+    return res.json();
   },
 
   async getHealth() {
     const base = getApiBaseUrl();
     const res = await fetch(`${base}/health`);
+    return res.json();
+  },
+
+  async getUVForecast(latitude: number, longitude: number): Promise<UVGuidanceResponse> {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/integrations/uv/forecast?latitude=${latitude}&longitude=${longitude}`);
+    if (!res.ok) {
+      throw new Error("Failed to load UV forecast data");
+    }
+    return res.json();
+  },
+
+  async searchCosmeticAdverseEvents(query: string, limit: number = 5): Promise<CosmeticAdverseEventResponse> {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/integrations/cosmetics/adverse-events?query=${encodeURIComponent(query)}&limit=${limit}`);
+    if (!res.ok) {
+      throw new Error("Failed to query openFDA cosmetic adverse events");
+    }
+    return res.json();
+  },
+
+  async getModelsStatus(): Promise<ModelsStatusResponse> {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/integrations/models/status`);
+    if (!res.ok) {
+      throw new Error("Failed to retrieve models status");
+    }
     return res.json();
   },
 };

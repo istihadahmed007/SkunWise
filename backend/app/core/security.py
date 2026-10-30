@@ -42,3 +42,30 @@ def decode_access_token(token: str) -> dict:
             detail="Could not validate credentials or token expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+def create_guest_token(assessment_id: int, session_code: str) -> str:
+    """
+    Creates an unguessable, scoped, expiring JWT for guest patient assessment access.
+    Valid for GUEST_TOKEN_EXPIRE_MINUTES (default 24 hours).
+    """
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.GUEST_TOKEN_EXPIRE_MINUTES)
+    payload = {
+        "sub": f"guest_aid_{assessment_id}",
+        "scope": "guest_assessment",
+        "aid": assessment_id,
+        "code": session_code,
+        "exp": expire
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+def verify_guest_token(token: str, assessment_id: int) -> bool:
+    """
+    Verifies that the guest token is authentic, unexpired, and scoped specifically to the assessment.
+    """
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("scope") != "guest_assessment":
+            return False
+        return payload.get("aid") == assessment_id
+    except Exception:
+        return False

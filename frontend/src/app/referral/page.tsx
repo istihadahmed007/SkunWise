@@ -2,110 +2,38 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { api, AssessmentSummary } from "@/lib/api";
+import { api, Provider, AssessmentSummary } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-
-interface Doctor {
-  id: string;
-  name: string;
-  credentials: string;
-  specialty: string;
-  clinic: string;
-  location: string;
-  modality: "telehealth" | "clinic" | "both";
-  rating: number;
-  reviewCount: number;
-  nextAvailable: string;
-  consultationFee: string;
-  acceptsInsurance: boolean;
-  avatarUrl: string;
-  languages: string[];
-}
-
-const DOCTORS_DATA: Doctor[] = [
-  {
-    id: "doc-1",
-    name: "Dr. Elena Rostova",
-    credentials: "MD, FAAD",
-    specialty: "Pigmented Lesions & Dermato-Oncology",
-    clinic: "Metropolitan Dermatology & Laser Center",
-    location: "Downtown Medical Plaza, Suite 400 (or Virtual)",
-    modality: "both",
-    rating: 4.9,
-    reviewCount: 142,
-    nextAvailable: "Today at 3:30 PM (Telehealth)",
-    consultationFee: "$120",
-    acceptsInsurance: true,
-    avatarUrl: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80",
-    languages: ["English", "Spanish"]
-  },
-  {
-    id: "doc-2",
-    name: "Dr. Marcus Vance",
-    credentials: "MD, PhD",
-    specialty: "Inflammatory Dermatoses & Eczema Specialist",
-    clinic: "University Health Dermatology Pavilion",
-    location: "450 Academic Way (In-Clinic)",
-    modality: "clinic",
-    rating: 4.8,
-    reviewCount: 98,
-    nextAvailable: "Tomorrow at 10:15 AM",
-    consultationFee: "$145",
-    acceptsInsurance: true,
-    avatarUrl: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80",
-    languages: ["English"]
-  },
-  {
-    id: "doc-3",
-    name: "Dr. Ayesha Rahman",
-    credentials: "MBBS, FCPS (Dermatology)",
-    specialty: "Pediatric & General Dermatology",
-    clinic: "Skin & Allergy Comprehensive Institute",
-    location: "Telehealth Video Consult (Nationwide)",
-    modality: "telehealth",
-    rating: 4.95,
-    reviewCount: 215,
-    nextAvailable: "Today within 2 Hours",
-    consultationFee: "$85",
-    acceptsInsurance: true,
-    avatarUrl: "https://images.unsplash.com/photo-1594824813589-9a706509ec29?w=150&auto=format&fit=crop&q=80",
-    languages: ["English", "Bangla", "Hindi"]
-  },
-  {
-    id: "doc-4",
-    name: "Dr. Jonathan Kim",
-    credentials: "MD, FAAD, FACMS",
-    specialty: "Mohs Micrographic Surgery & Skin Cancer",
-    clinic: "Advanced Oncology Dermatology Associates",
-    location: "Northwest Cancer Pavilion",
-    modality: "clinic",
-    rating: 4.9,
-    reviewCount: 180,
-    nextAvailable: "Thursday at 1:00 PM",
-    consultationFee: "$180",
-    acceptsInsurance: true,
-    avatarUrl: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&auto=format&fit=crop&q=80",
-    languages: ["English", "Korean"]
-  }
-];
 
 export default function ReferralPage() {
   const { user, isAuthenticated } = useAuth();
   const { t, language } = useLanguage();
 
-  const [doctors, setDoctors] = useState<Doctor[]>(DOCTORS_DATA);
-  const [selectedModality, setSelectedModality] = useState<string>("all");
-  const [selectedSpecialty, setSelectedSpecialty] = useState<string>("all");
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [selectedDivision, setSelectedDivision] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [latestAssessment, setLatestAssessment] = useState<AssessmentSummary | null>(null);
-  const [attachDossier, setAttachDossier] = useState<boolean>(true);
-  const [bookedDoctor, setBookedDoctor] = useState<Doctor | null>(null);
 
   useEffect(() => {
+    loadProviders();
     if (isAuthenticated) {
       loadLatestAssessment();
     }
-  }, [isAuthenticated]);
+  }, [selectedDivision, isAuthenticated]);
+
+  async function loadProviders() {
+    setIsLoading(true);
+    try {
+      const res = await api.getProviders(selectedDivision, searchQuery);
+      setProviders(res.providers || []);
+    } catch (e) {
+      console.error("Failed to load providers", e);
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   async function loadLatestAssessment() {
     try {
@@ -114,18 +42,14 @@ export default function ReferralPage() {
         setLatestAssessment(history[0]);
       }
     } catch (e) {
-      // Non-critical if history cannot be loaded
+      // Non-critical
     }
   }
 
-  const filteredDoctors = doctors.filter((doc) => {
-    if (selectedModality === "telehealth" && doc.modality === "clinic") return false;
-    if (selectedModality === "clinic" && doc.modality === "telehealth") return false;
-    if (selectedSpecialty !== "all" && !doc.specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())) {
-      return false;
-    }
-    return true;
-  });
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadProviders();
+  };
 
   return (
     <div className="min-h-screen bg-[#f0f8fb] text-[#192531] pb-24">
@@ -133,34 +57,39 @@ export default function ReferralPage() {
       <section className="bg-white border-b border-[#d6e8f0] py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#2b7f8f]">
-              <span className="material-symbols-outlined text-sm">stethoscope</span>
-              <span>{language === "bn" ? "ডাক্তার ও চর্মরোগ বিশেষজ্ঞ ডিরেক্টরি" : "Dermatologist & Clinical Directory"}</span>
+            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#2b7f8f] bg-[#eaf4f8] px-3 py-1 rounded-full mb-2">
+              <span className="material-symbols-outlined text-sm">local_hospital</span>
+              <span>{language === "bn" ? "যাচাইকৃত হাসপাতাল ও বিশেষজ্ঞ ডিরেক্টরি" : "Verified Clinical Provider Directory"}</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#192531] tracking-tight mt-1 font-headline">
-              {language === "bn" ? "চর্মরোগ বিশেষজ্ঞের পরামর্শ নিন" : "Find an In-Person or Telehealth Doctor"}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#192531] tracking-tight font-headline">
+              {language === "bn" ? "চর্মরোগ বিশেষজ্ঞ ও ক্লিনিকাল রেফারেল" : "Dermatology Centers & Doctor Referrals"}
             </h1>
-            <p className="text-sm text-[#4a5d6e] mt-1 max-w-2xl">
+            <p className="text-sm text-[#4a5d6e] mt-1 max-w-2xl leading-relaxed">
               {language === "bn"
-                ? "অভিজ্ঞ চর্মরোগ বিশেষজ্ঞদের সাথে সরাসরি বা ভার্চুয়াল পরামর্শ নিন এবং আপনার সারসংক্ষেপ শেয়ার করুন।"
-                : "Connect with qualified clinicians for in-person examinations or virtual consultations."}
+                ? "বাংলাদেশে যাচাইকৃত সরকারি ও বিশেষায়িত চর্মরোগ বহির্বিভাগের তথ্য জানুন এবং সরাসরি যোগাযোগের জন্য আপনার ক্লিনিকাল সারাংশ (PDF) প্রস্তুত রাখুন।"
+                : "Explore verified clinical dermatology departments and outpatient clinics across Bangladesh. Download your structured consultation dossier to share with attending physicians."}
             </p>
           </div>
 
           {latestAssessment && (
-            <div className="bg-[#eaf4f8] border border-[#cce4ee] rounded-2xl p-3.5 flex items-center gap-3">
+            <div className="bg-[#eaf4f8] border border-[#cce4ee] rounded-2xl p-4 flex items-center gap-3 shrink-0 self-start md:self-auto">
               <span className="material-symbols-outlined text-[#2b7f8f] text-2xl">assignment_turned_in</span>
               <div>
-                <div className="text-[10px] font-bold text-[#718292] uppercase tracking-wider">Ready to Attach</div>
-                <div className="text-xs font-bold text-[#192531]">{latestAssessment.primary_condition} ({latestAssessment.anatomical_region})</div>
+                <div className="text-[10px] font-bold text-[#718292] uppercase tracking-wider">
+                  {language === "bn" ? "সর্বশেষ সংরক্ষিত চেক" : "Latest Assessment"}
+                </div>
+                <div className="text-xs font-bold text-[#192531]">
+                  {latestAssessment.primary_condition} ({latestAssessment.anatomical_region})
+                </div>
               </div>
               <a
                 href={api.getPdfUrl(latestAssessment.id)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-2 text-xs font-bold text-[#2b7f8f] hover:underline"
+                className="ml-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#2b7f8f] text-white text-xs font-bold shadow-xs hover:bg-[#236875] transition-colors"
               >
-                Preview PDF
+                <span className="material-symbols-outlined text-sm">download</span>
+                <span>PDF</span>
               </a>
             </div>
           )}
@@ -168,224 +97,178 @@ export default function ReferralPage() {
       </section>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        {/* Triage Warning Alert */}
-        <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-3">
-          <span className="material-symbols-outlined text-amber-600 text-lg shrink-0 mt-0.5">warning</span>
-          <div className="leading-relaxed">
-            <span className="font-bold">Routine Appointment Notice: </span>
-            This referral directory is intended for non-emergency consultations. If you have fever with a rapidly spreading rash, respiratory distress, facial edema, or widespread peeling skin, do not wait for an appointment—call emergency services (911 / 112 / 999) or visit the nearest emergency department immediately.
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+        
+        {/* Transparent Booking Availability & Referral Notice */}
+        <div className="bg-white p-5 rounded-2xl border border-[#d6e8f0] shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#eaf4f8] text-[#2b7f8f] flex items-center justify-center shrink-0 mt-0.5">
+              <span className="material-symbols-outlined text-xl">info</span>
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-[#192531]">
+                {language === "bn" ? "রেফারেল ও পরামর্শ নির্দেশিকা" : "Referral & Appointment Guidance"}
+              </h4>
+              <p className="text-xs sm:text-sm text-[#4a5d6e] mt-0.5 max-w-3xl leading-relaxed">
+                {language === "bn"
+                  ? "সরাসরি অ্যাপের মাধ্যমে তাৎক্ষণিক অনলাইন বুকিং বর্তমানে ডিরেক্টরি ও প্রস্তুতি পর্যায়ে রয়েছে। রোগীরা সরাসরি হাসপাতালের বহির্বিভাগ কাউন্টারে যোগাযোগ করতে পারেন অথবা টেলিফোনে অ্যাপয়েন্টমেন্ট নির্ধারণ করতে পারেন।"
+                  : "Direct in-app electronic booking is currently in directory phase. Patients can contact the clinic hotlines listed below or present in-person at hospital outpatient registration desks with their downloaded SkinWise Clinical Dossier (PDF)."}
+              </p>
+            </div>
           </div>
+          {latestAssessment && (
+            <a
+              href={api.getPdfUrl(latestAssessment.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs sm:text-sm font-bold text-[#2b7f8f] hover:underline whitespace-nowrap self-end sm:self-center inline-flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-base">picture_as_pdf</span>
+              <span>{language === "bn" ? "ডাক্তার সারসংক্ষেপ (PDF) ↗" : "Clinical Dossier (PDF) ↗"}</span>
+            </a>
+          )}
         </div>
 
-        {/* Filters */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 mb-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Consultation:</span>
+        {/* Search & Division Filters */}
+        <div className="bg-white p-5 rounded-2xl border border-[#d6e8f0] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          {/* Division Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
             {[
-              { id: "all", label: "All Modalities" },
-              { id: "telehealth", label: "Telehealth (Video)" },
-              { id: "clinic", label: "In-Person Clinic" }
-            ].map((btn) => (
+              { id: "all", label: language === "bn" ? "সমগ্র বাংলাদেশ" : "All Bangladesh" },
+              { id: "dhaka", label: language === "bn" ? "ঢাকা" : "Dhaka" },
+              { id: "chittagong", label: language === "bn" ? "চট্টগ্রাম" : "Chittagong" },
+              { id: "sylhet", label: language === "bn" ? "সিলেট" : "Sylhet" },
+            ].map((div) => (
               <button
-                key={btn.id}
-                onClick={() => setSelectedModality(btn.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  selectedModality === btn.id
-                    ? "bg-[#006194] text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                key={div.id}
+                type="button"
+                onClick={() => setSelectedDivision(div.id)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  selectedDivision === div.id
+                    ? "bg-[#2b7f8f] text-white shadow-xs"
+                    : "bg-[#f0f8fb] text-[#4a5d6e] hover:bg-[#eaf4f8] hover:text-[#192531]"
                 }`}
               >
-                {btn.label}
+                {div.label}
               </button>
             ))}
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Specialty:</label>
-            <select
-              value={selectedSpecialty}
-              onChange={(e) => setSelectedSpecialty(e.target.value)}
-              className="text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-slate-800 focus:outline-none focus:border-[#006194]"
+          {/* Search Input */}
+          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 max-w-md w-full">
+            <div className="relative flex-1">
+              <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">
+                search
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={language === "bn" ? "হাসপাতাল বা এলাকার নাম খুঁজুন..." : "Search hospital or area..."}
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm focus:border-[#2b7f8f] focus:ring-1 focus:ring-[#2b7f8f] bg-white"
+              />
+            </div>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-[#2b7f8f] text-white text-xs font-bold hover:bg-[#236875] transition-colors"
             >
-              <option value="all">All Specialties</option>
-              <option value="lesion">Lesions & Oncology</option>
-              <option value="eczema">Eczema & Inflammatory</option>
-              <option value="pediatric">Pediatric Dermatology</option>
-              <option value="surgery">Mohs & Surgery</option>
-            </select>
+              {language === "bn" ? "খুঁজুন" : "Search"}
+            </button>
+          </form>
+        </div>
+
+        {/* Provider Cards List */}
+        {isLoading ? (
+          <div className="py-16 text-center text-slate-500">
+            <span className="material-symbols-outlined animate-spin text-3xl text-[#2b7f8f] mb-2">progress_activity</span>
+            <p className="text-sm">Loading verified healthcare facilities...</p>
           </div>
-        </div>
-
-        {/* Doctor List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredDoctors.map((doc) => (
-            <div
-              key={doc.id}
-              className="bg-white rounded-2xl border border-slate-200 hover:border-[#39b8fd] p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
-                    <img
-                      src={doc.avatarUrl}
-                      alt={doc.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-bold text-[#131b2e] flex items-center gap-1.5">
-                        <span>{doc.name}</span>
-                        <span className="text-xs font-normal text-slate-500">{doc.credentials}</span>
-                      </h3>
-                      <div className="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                        <span className="material-symbols-outlined text-xs">star</span>
-                        <span>{doc.rating}</span>
-                        <span className="text-[10px] text-slate-400">({doc.reviewCount})</span>
+        ) : providers.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {providers.map((p) => (
+              <div
+                key={p.id}
+                className="bg-white rounded-3xl p-6 border border-[#d6e8f0] shadow-xs flex flex-col justify-between space-y-4 hover:border-[#2b7f8f] transition-all"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#eaf4f8] text-[#2b7f8f] border border-[#cce4ee] mb-1">
+                        <span className="material-symbols-outlined text-xs">verified</span>
+                        <span>{p.type}</span>
                       </div>
-                    </div>
-
-                    <p className="text-xs font-semibold text-[#006194] mt-0.5">{doc.specialty}</p>
-                    <p className="text-xs text-slate-600 mt-1">{doc.clinic}</p>
-                    <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1">
-                      <span className="material-symbols-outlined text-xs">location_on</span>
-                      <span>{doc.location}</span>
+                      <h3 className="text-base sm:text-lg font-bold text-[#192531] leading-tight">
+                        {p.name}
+                      </h3>
+                      <p className="text-xs text-[#2b7f8f] font-semibold mt-0.5">
+                        {p.department}
+                      </p>
                     </div>
                   </div>
-                </div>
 
-                {/* Modality Chips & Info */}
-                <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 text-[11px] font-semibold">
-                      <span className="material-symbols-outlined text-xs">bolt</span>
-                      <span>{doc.nextAvailable}</span>
-                    </span>
+                  <div className="space-y-1.5 text-xs text-[#4a5d6e] pt-1 border-t border-slate-100">
+                    <div className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-sm text-[#718292] shrink-0 mt-0.5">location_on</span>
+                      <span>{p.location}</span>
+                    </div>
 
-                    {doc.modality === "both" || doc.modality === "telehealth" ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 text-[#006194] text-[10px] font-semibold">
-                        <span className="material-symbols-outlined text-xs">videocam</span>
-                        <span>Video Ready</span>
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-sm text-[#718292] shrink-0">schedule</span>
+                      <span>{p.opd_hours}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-sm text-[#718292] shrink-0">payments</span>
+                      <span>Fee Schedule: <strong className="text-slate-900">{p.consultation_fee_bdt}</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Services tags */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {p.services.slice(0, 3).map((svc, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-[#f0f8fb] text-[#4a5d6e] px-2.5 py-0.5 rounded-lg text-[11px] font-medium border border-[#d6e8f0]"
+                      >
+                        {svc}
                       </span>
-                    ) : null}
+                    ))}
                   </div>
 
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-slate-900">{doc.consultationFee}</span>
-                    <span className="text-[10px] text-slate-500 block">
-                      {doc.acceptsInsurance ? "Accepts Insurance" : "Self-Pay Only"}
-                    </span>
-                  </div>
+                  {p.notes && (
+                    <p className="text-[11px] text-slate-500 italic bg-[#f0f8fb] p-2.5 rounded-xl border border-slate-200">
+                      ℹ️ {p.notes}
+                    </p>
+                  )}
                 </div>
-              </div>
 
-              {/* Action Buttons */}
-              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center gap-3">
-                <button
-                  onClick={() => setBookedDoctor(doc)}
-                  className="flex-1 py-2.5 rounded-xl bg-[#006194] hover:bg-[#004e77] text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-sm">calendar_month</span>
-                  <span>Book Appointment</span>
-                </button>
-
-                {latestAssessment && (
+                {/* Card Action Bar */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3 text-xs">
                   <a
-                    href={api.getPdfUrl(latestAssessment.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:text-[#006194] hover:border-[#006194] text-xs font-semibold transition-all flex items-center gap-1"
-                    title="Transfer Dossier"
+                    href={`tel:${p.contact_phone.split("/")[0].trim()}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2b7f8f] hover:bg-[#236875] text-white font-bold transition-colors shadow-xs"
                   >
-                    <span className="material-symbols-outlined text-sm">attach_file</span>
-                    <span>Dossier</span>
+                    <span className="material-symbols-outlined text-sm">call</span>
+                    <span>{p.contact_phone.split("/")[0].trim()}</span>
                   </a>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
 
-        {/* Appointment Booking Confirmation Modal */}
-        {bookedDoctor && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#006194]">
-                  <span className="material-symbols-outlined text-base">verified</span>
-                  <span>Consultation Referral Dispatch</span>
+                  <span className="text-[11px] text-[#718292] font-medium">
+                    {p.booking_mode}
+                  </span>
                 </div>
-                <button
-                  onClick={() => setBookedDoctor(null)}
-                  className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center"
-                >
-                  <span className="material-symbols-outlined text-sm">close</span>
-                </button>
               </div>
-
-              <div className="mt-4">
-                <h3 className="text-base font-bold text-[#131b2e]">
-                  Schedule with {bookedDoctor.name}, {bookedDoctor.credentials}
-                </h3>
-                <p className="text-xs text-slate-600 mt-1">
-                  {bookedDoctor.specialty} • {bookedDoctor.clinic}
-                </p>
-
-                <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs text-slate-700">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Earliest Slot:</span>
-                    <span className="font-semibold text-slate-900">{bookedDoctor.nextAvailable}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Consultation Fee:</span>
-                    <span className="font-semibold text-slate-900">{bookedDoctor.consultationFee}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Format:</span>
-                    <span className="font-semibold text-slate-900 capitalize">{bookedDoctor.modality}</span>
-                  </div>
-                </div>
-
-                {latestAssessment && (
-                  <div className="mt-4 p-3 rounded-xl border border-sky-200 bg-sky-50 flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="attachDoc"
-                      checked={attachDossier}
-                      onChange={(e) => setAttachDossier(e.target.checked)}
-                      className="w-4 h-4 text-[#006194] rounded border-slate-300"
-                    />
-                    <label htmlFor="attachDoc" className="text-xs text-slate-800 cursor-pointer">
-                      Attach recent intake (<span className="font-semibold">{latestAssessment.primary_condition}</span>) and optical viability metrics to the clinic briefing.
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6 flex items-center gap-3">
-                <button
-                  onClick={() => setBookedDoctor(null)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    alert(`Referral request sent to ${bookedDoctor.name}! The clinic will confirm your slot at ${bookedDoctor.nextAvailable}.`);
-                    setBookedDoctor(null);
-                  }}
-                  className="flex-1 py-2.5 rounded-xl bg-[#006194] hover:bg-[#004e77] text-white text-xs font-bold shadow-sm"
-                >
-                  Confirm & Reserve
-                </button>
-              </div>
-            </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-12 px-4 bg-white rounded-3xl border border-dashed border-[#d6e8f0] text-center space-y-2">
+            <span className="material-symbols-outlined text-3xl text-slate-400">search_off</span>
+            <p className="text-sm text-slate-600">
+              {language === "bn" ? "কোনো হাসপাতাল বা ক্লিনিক পাওয়া যায়নি।" : "No providers found matching your search criteria."}
+            </p>
           </div>
         )}
+
       </main>
     </div>
   );
 }
-

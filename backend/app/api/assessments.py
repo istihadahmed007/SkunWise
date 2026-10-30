@@ -4,14 +4,16 @@ from datetime import datetime, timezone
 from typing import Optional, List
 from pathlib import Path
 from fastapi import (
-    APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Response
+    APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, status, Request
 )
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.config import settings
+from app.core.rate_limiter import analyze_rate_limiter
+from app.core.security import create_guest_token, verify_guest_token
 from app.models.schemas import (
-    User, Assessment, SymptomQuestionnaireInput, QualityMetricsModel,
+    User, Assessment, ConsentRecord, SymptomQuestionnaireInput, QualityMetricsModel,
     TriageResultModel, AssessmentResponse, AssessmentSummaryItem
 )
 from app.api.deps import get_current_user, get_current_user_optional
@@ -29,6 +31,7 @@ router = APIRouter(prefix="/skin", tags=["Dermatological Assessment"])
 
 @router.post("/analyze", response_model=AssessmentResponse)
 async def analyze_skin(
+    request: Request,
     file: UploadFile = File(..., description="High-resolution clinical dermatological image"),
     symptoms_json: str = Form(..., description="JSON stringified SymptomQuestionnaireInput"),
     anatomical_region: Optional[str] = Form("Volar Forearm"),
@@ -36,30 +39,21 @@ async def analyze_skin(
     db: Session = Depends(get_db)
 ):
     """
-    Core Multi-Modal Skin Identification, Triage, and Recommendation Pipeline:
-    1. Validates and strips EXIF from uploaded image.
-    2. Runs automated optical viability and quality evaluation.
-    3. Runs vision engine inference (morphological feature extraction + calibrated class distribution).
-    4. Evaluates systemic emergency danger signs (precedence rule).
-    5. Determines care pathway (Tier 1: Mild, Tier 2: Doctor Recommended, Tier 3: Urgent Alert).
-    6. Synthesizes multimodal evidence and retrieves source-traceable clinical guidance.
-    7. Persists encrypted assessment record and manages private storage.
+    Security-Hardened Multi-Modal Skin Identification, Triage, and Recommendation Pipeline:
+    1. Enforces rate limiting against abuse and resource exhaustion.
+    2. Validates explicit patient consent (biometric intake and non-diagnostic limitation).
+    3. Validates actual magic bytes, dimensions, aspect ratio, and strips all EXIF metadata.
+    4. Evaluates human skin presence and optical quality viability.
+    5. Runs genuine vision engine inference with honest uncertainty.
+    6. Evaluates independent clinical safety triage (emergency red flags strictly take precedence).
+    7. Synthesizes multimodal evidence and evidence-based conservative care guidance.
+    8. Persists encrypted assessment record and manages private storage.
+    9. Issues scoped expiring guest token if user is unauthenticated.
     """
-    # 0. Ensure user exists (create temporary guest patient if not logged in)
-    if not user:
-        guest_email = f"guest_{uuid.uuid4().hex[:8]}@skinwise.local"
-        user = User(
-            email=guest_email,
-            hashed_password="guest_no_direct_login",
-            full_name="Guest Patient",
-            is_active=True,
-            zero_cloud_retention=False
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+    # 0. Enforce rate limiting
+    analyze_rate_limiter.enforce(request, identifier_suffix="analyze")
 
-    # 1. Parse symptom questionnaire
+    # 1. Parse and validate symptom questionnaire & mandatory consent
     try:
         symptom_dict = json.loads(symptoms_json)
         symptoms = SymptomQuestionnaireInput(**symptom_dict)
@@ -69,7 +63,38 @@ async def analyze_skin(
             detail=f"Invalid symptom questionnaire payload: {str(e)}"
         )
 
-    # 2. Read and sanitize image
+    # Enforce mandatory explicit patient consent before processing photograph
+    if not symptoms.consent_biometric or not symptoms.consent_disclaimer:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mandatory consent missing. Both biometric photo processing consent and non-diagnostic disclaimer acknowledgment must be provided."
+        )
+
+    is_guest = user is None
+    if is_guest:
+        guest_email = f"guest_{uuid.uuid4().hex[:10]}@skinwise.local"
+        user = User(
+            email=guest_email,
+            hashed_password="guest_session_token_protected",
+            full_name="Guest Patient",
+            is_active=True,
+            zero_cloud_retention=False,
+            data_retention_days=1  # 24h retention for guest sessions
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        # Record guest consent
+        db.add(ConsentRecord(
+            user_id=user.id,
+            consent_type="guest_biometric_intake_authorization",
+            agreed=True,
+            terms_version="SW-2026-v1.0"
+        ))
+        db.commit()
+
+    # 2. Read and sanitize image (validates magic bytes, pixel boundaries, EXIF stripping)
     raw_bytes = await file.read()
     clean_bytes, image_hash, width, height = sanitize_and_validate_image(
         raw_bytes, file.filename or "skin_photo.jpg", file.content_type
@@ -79,7 +104,7 @@ async def analyze_skin(
     quality_metrics = evaluate_image_quality(clean_bytes)
     is_quality_acceptable = quality_metrics["is_acceptable"]
 
-    # 4. Computer Vision Inference (or Inconclusive Handling)
+    # 4. Computer Vision Inference (Modular Pipeline with Skin Locus Validation)
     visual_findings = vision_engine.infer(clean_bytes)
 
     # 5. Independent Safety Triage Engine (Emergency Red Flags Evaluated First)
@@ -89,7 +114,7 @@ async def analyze_skin(
         is_quality_acceptable=is_quality_acceptable
     )
 
-    # 6. Recommendation Engine (Multimodal Fusion & Knowledge Retrieval)
+    # 6. Recommendation Engine (Evidence-Based Conservative Care)
     triage_result = recommendation_engine.generate_clinical_assessment(
         symptoms=symptoms,
         visual_findings=visual_findings,
@@ -144,7 +169,15 @@ async def analyze_skin(
     db.commit()
     db.refresh(assessment)
 
-    image_url = f"/api/skin/images/{saved_filename}" if saved_filename != "EPHEMERAL_PURGED" else "/placeholder-ephemeral.png"
+    # 9. Scoped Guest Access Token Generation
+    guest_access_token = None
+    if is_guest:
+        guest_access_token = create_guest_token(assessment.id, session_code)
+        assessment.guest_access_token = guest_access_token
+        db.commit()
+
+    token_param = f"?guest_token={guest_access_token}" if guest_access_token else ""
+    image_url = f"/api/skin/images/{saved_filename}{token_param}" if saved_filename != "EPHEMERAL_PURGED" else "/placeholder-ephemeral.png"
 
     return AssessmentResponse(
         id=assessment.id,
@@ -156,29 +189,50 @@ async def analyze_skin(
         quality_metrics=QualityMetricsModel(**quality_metrics),
         symptom_data=assessment.symptom_data,
         triage=triage_result,
-        is_archived=assessment.is_archived
+        is_archived=assessment.is_archived,
+        guest_access_token=guest_access_token
     )
 
 
 @router.get("/assessment/{id}", response_model=AssessmentResponse)
 def get_assessment(
     id: int,
+    guest_token: Optional[str] = Query(None, description="Scoped access token for guest patient assessments"),
     user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
     Retrieves full structured assessment details by ID.
-    Enforces ownership permissions.
+    STRICT SECURITY ENFORCEMENT:
+    - If user is authenticated: verifies user.id == assessment.user_id (cross-patient access blocked).
+    - If unauthenticated: requires valid, unexpired, scoped guest_token matching assessment.id.
+    - Prevents any anonymous or unauthorized inspection of clinical records.
     """
     assessment = db.query(Assessment).filter(Assessment.id == id, Assessment.is_deleted == False).first()
     if not assessment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
 
-    # Ownership check if user is authenticated
-    if user and assessment.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this clinical record.")
+    # Strict Authorization Gate
+    has_access = False
+    if user and assessment.user_id == user.id:
+        has_access = True
+    elif guest_token and verify_guest_token(guest_token, assessment.id):
+        has_access = True
 
-    image_url = f"/api/skin/images/{assessment.image_filename}" if assessment.image_filename != "EPHEMERAL_PURGED" else "/placeholder-ephemeral.png"
+    if not has_access:
+        if user:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You do not own this clinical assessment record."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication or a valid guest access token is required to view this clinical record."
+            )
+
+    token_param = f"?guest_token={guest_token}" if guest_token else ""
+    image_url = f"/api/skin/images/{assessment.image_filename}{token_param}" if assessment.image_filename != "EPHEMERAL_PURGED" else "/placeholder-ephemeral.png"
 
     guidance = assessment.clinical_guidance or {}
     triage_model = TriageResultModel(
@@ -217,7 +271,8 @@ def get_assessment(
         quality_metrics=QualityMetricsModel(**assessment.quality_metrics),
         symptom_data=assessment.symptom_data,
         triage=triage_model,
-        is_archived=assessment.is_archived
+        is_archived=assessment.is_archived,
+        guest_access_token=guest_token
     )
 
 
@@ -227,7 +282,8 @@ def get_assessment_history(
     db: Session = Depends(get_db)
 ):
     """
-    Returns the user's historical dermatological triage assessments.
+    Returns the authenticated user's historical dermatological triage assessments.
+    Enforces user isolation.
     """
     records = db.query(Assessment).filter(
         Assessment.user_id == user.id,
@@ -263,6 +319,7 @@ def delete_assessment(
 ):
     """
     Permanently deletes a patient assessment and purges associated image from disk.
+    Enforces user ownership.
     """
     assessment = db.query(Assessment).filter(Assessment.id == id, Assessment.user_id == user.id).first()
     if not assessment:
@@ -282,18 +339,32 @@ def delete_assessment(
 @router.get("/assessment/{id}/pdf")
 def export_assessment_pdf(
     id: int,
+    guest_token: Optional[str] = Query(None, description="Scoped access token for guest patient assessments"),
     user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
-    Generates and downloads a standardized, HL7 / FHIR aligned clinical referral dossier PDF.
+    Generates and downloads clinical referral dossier PDF.
+    STRICT AUTHORIZATION: Requires user ownership or valid scoped guest token.
     """
     assessment = db.query(Assessment).filter(Assessment.id == id, Assessment.is_deleted == False).first()
     if not assessment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
 
+    has_access = False
+    if user and assessment.user_id == user.id:
+        has_access = True
+    elif guest_token and verify_guest_token(guest_token, assessment.id):
+        has_access = True
+
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to this clinical PDF dossier."
+        )
+
     user_name = user.full_name if user else "Patient (Consultation Copy)"
-    user_email = user.email if user else "Not registered"
+    user_email = user.email if user else "Confidential Patient"
 
     triage_data = {
         "triage_tier": assessment.triage_tier,
@@ -333,12 +404,39 @@ def export_assessment_pdf(
 @router.get("/images/{filename}")
 def get_private_image(
     filename: str,
-    user: Optional[User] = Depends(get_current_user_optional)
+    guest_token: Optional[str] = Query(None, description="Scoped access token for guest patient assessments"),
+    user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
 ):
     """
-    Access-controlled image serving endpoint.
-    Verifies that the requested image exists and prevents path traversal.
+    Access-controlled image serving endpoint:
+    Verifies that the requested image exists and that the requesting party is either:
+    1. The authenticated patient who owns the assessment, or
+    2. A guest holder with a valid, unexpired scoped guest token for this assessment.
+    Prevents unauthorized image enumeration and cross-patient eavesdropping.
     """
+    assessment = db.query(Assessment).filter(
+        Assessment.image_filename == filename,
+        Assessment.is_deleted == False
+    ).first()
+
+    if not assessment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found or has been purged per zero-cloud retention policy."
+        )
+
+    has_access = False
+    if user and assessment.user_id == user.id:
+        has_access = True
+    elif guest_token and verify_guest_token(guest_token, assessment.id):
+        has_access = True
+
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. You do not have authorization to view this patient photograph."
+        )
+
     filepath = get_private_image_path(filename)
     return FileResponse(filepath, media_type="image/jpeg")
-

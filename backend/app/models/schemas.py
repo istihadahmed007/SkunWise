@@ -43,6 +43,18 @@ class ConsentRecord(Base):
     user = relationship("User", back_populates="consents")
 
 
+class ConsentAudit(Base):
+    __tablename__ = "consent_audits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    action = Column(String(50), nullable=False)  # "granted", "withdrawn", "scrubbed"
+    consent_type = Column(String(100), nullable=False)
+    ip_hash = Column(String(64), nullable=True)
+    details = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+
 class Assessment(Base):
     __tablename__ = "assessments"
 
@@ -70,6 +82,7 @@ class Assessment(Base):
     emergency_warning_detected = Column(Boolean, default=False)
     is_inconclusive = Column(Boolean, default=False)
     inconclusive_reason = Column(String(255), nullable=True)
+    guest_access_token = Column(String(255), nullable=True, index=True)
     
     is_archived = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)
@@ -146,6 +159,10 @@ class SymptomQuestionnaireInput(BaseModel):
     midday_skin_feel: Optional[str] = Field("balanced", description="midday skin feel: oily, dry, combination, balanced")
     skin_sensitivity: Optional[str] = Field("rarely_reacts", description="skin reaction tendency: easily_irritated, rarely_reacts")
     
+    # Explicit Biometric & Medical Disclaimer Consent (Mandatory for Intake)
+    consent_biometric: bool = Field(True, description="Explicit consent to analyze skin photography")
+    consent_disclaimer: bool = Field(True, description="Acknowledgment that SkinWise AI is informational and non-diagnostic")
+
     # Critical Red-Flag Systemic Emergency Questions
     has_fever_or_chills: bool = Field(False, description="Systemic fever > 100.4F / 38C")
     has_facial_or_throat_swelling: bool = Field(False, description="Lip, tongue, or facial swelling")
@@ -237,6 +254,7 @@ class AssessmentResponse(BaseModel):
     symptom_data: Dict[str, Any]
     triage: TriageResultModel
     is_archived: bool
+    guest_access_token: Optional[str] = None
 
 class AssessmentSummaryItem(BaseModel):
     id: int

@@ -78,7 +78,14 @@ export const translations = {
     toggleOverlay: "Toggle Detected Area Overlay",
     overlayActive: "Overlay On",
     overlayHidden: "Overlay Off",
-    patchTestNotice: "Important: Patch-test new products on your inner forearm for 24 hours. Stop immediately if irritation occurs."
+    patchTestNotice: "Important: Patch-test new products on your inner forearm for 24 hours. Stop immediately if irritation occurs.",
+    uvGuidanceTitle: "Daily UV & Photoprotection (Open-Meteo)",
+    uvGuidanceDesc: "Real-time UV radiation index and evidence-based sun habits.",
+    cosmeticSafetyTitle: "Cosmetic Safety Lookup (openFDA CAERS)",
+    cosmeticSafetyDesc: "Search reported cosmetic adverse events from the FDA CAERS database. Reports do not establish causation.",
+    fdaDisclaimerNote: "FDA Note: Adverse event reports submitted to FDA CAERS do not prove that a product caused the reaction.",
+    detectLocationBtn: "Check Local UV",
+    searchProductBtn: "Search FDA Reports"
   },
   bn: {
     medicalNotice: "স্কিনওয়াইজ তথ্য ও সাধারণ সচেতনতামূলক পরামর্শ দেয়। এটি কোনো রোগ নির্ণয় করে না এবং ডাক্তারের বিকল্প নয়।",
@@ -157,6 +164,13 @@ export const translations = {
     toggleOverlay: "শনাক্তকৃত এলাকা ওভারলে",
     overlayActive: "ওভারলে চালু",
     overlayHidden: "ওভারলে বন্ধ",
-    patchTestNotice: "সতর্কতা: নতুন কোনো প্রসাধন সামগ্রী ব্যবহারের আগে বাহুর ত্বকে ২৪ ঘণ্টা প্যাচ টেস্ট করে নিন।"
+    patchTestNotice: "সতর্কতা: নতুন কোনো প্রসাধন সামগ্রী ব্যবহারের আগে বাহুর ত্বকে ২৪ ঘণ্টা প্যাচ টেস্ট করে নিন।",
+    uvGuidanceTitle: "দৈনিক অতিবেগুনী রশ্মি (UV) ও রোদ সুরক্ষা",
+    uvGuidanceDesc: "লাইভ অতিবেগুনী সূচক ও প্রমাণ-ভিত্তিক রোদ সুরক্ষা নির্দেশিকা।",
+    cosmeticSafetyTitle: "প্রসাধন সামগ্রী নিরাপত্তা অনুসন্ধান (FDA CAERS)",
+    cosmeticSafetyDesc: "মার্কিন FDA CAERS ডাটাবেস থেকে অনাকাঙ্ক্ষিত প্রতিক্রিয়ার রিপোর্ট অনুসন্ধান করুন। রিপোর্ট সরাসরি কারণ নির্দেশ করে না।",
+    fdaDisclaimerNote: "FDA সতর্কতা: অনাকাঙ্ক্ষিত প্রতিক্রিয়ার রিপোর্ট কোনো পণ্য সরাসরি সমস্যার কারণ হিসেবে প্রমাণ করে না।",
+    detectLocationBtn: "স্থানীয় UV সূচক দেখুন",
+    searchProductBtn: "FDA রিপোর্ট অনুসন্ধান"
   }
 };

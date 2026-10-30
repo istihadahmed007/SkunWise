@@ -6,6 +6,8 @@ import Link from "next/link";
 import { api, Assessment, getApiBaseUrl } from "@/lib/api";
 import { TriageBadge } from "@/components/TriageBadge";
 import { useLanguage } from "@/context/LanguageContext";
+import { UVGuidanceCard } from "@/components/UVGuidanceCard";
+import { CosmeticSafetyCard } from "@/components/CosmeticSafetyCard";
 
 export default function AssessmentDetailPage() {
   const params = useParams();
@@ -504,6 +506,14 @@ export default function AssessmentDetailPage() {
           </Link>
         </div>
       </section>
+
+      {/* =========================================================================
+          OPTIONAL PUBLIC INTEGRATIONS: UV Guidance & Cosmetic Safety
+          ========================================================================= */}
+      <div className="space-y-6">
+        <UVGuidanceCard />
+        <CosmeticSafetyCard />
+      </div>
 
       {/* =========================================================================
           COMPACT EXPANDABLE SECTION: Additional Clinical Details & References

@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.database import engine, Base, SessionLocal
 from app.core.security import get_password_hash
 from app.models.schemas import User, Assessment, ConsentRecord
-from app.api import auth, assessments, health, knowledge
+from app.api import auth, assessments, health, knowledge, integrations, providers
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,11 +22,13 @@ async def lifespan(app: FastAPI):
     # Initialize SQLite / PostgreSQL tables
     Base.metadata.create_all(bind=engine)
     
-    # Seed initial test patient and mock assessment matching Stitch Screen C if empty
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.email == "sarah.patient@skinwise.local").first()
-        if not user:
+    # Seed initial test patient and mock assessment only if explicitly enabled in non-production environments
+    if settings.ENVIRONMENT != "production" and settings.SEED_DEMO_DATA:
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.email == "sarah.patient@skinwise.local").first()
+            if user:
+                return
             user = User(
                 email="sarah.patient@skinwise.local",
                 hashed_password=get_password_hash("ClinicalDemo2026!"),
@@ -191,8 +193,8 @@ async def lifespan(app: FastAPI):
             db.add(assessment1)
             db.add(assessment2)
             db.commit()
-    finally:
-        db.close()
+        finally:
+            db.close()
 
     yield
 
@@ -219,6 +221,8 @@ app.include_router(health.router, prefix=settings.API_V1_STR)
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(assessments.router, prefix=settings.API_V1_STR)
 app.include_router(knowledge.router, prefix=settings.API_V1_STR)
+app.include_router(integrations.router, prefix=settings.API_V1_STR)
+app.include_router(providers.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 @app.get(settings.API_V1_STR)

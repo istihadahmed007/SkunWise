@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, SymptomInput } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
+import { BodyMapSelector } from "@/components/BodyMapSelector";
 
 interface PhotoFeedback {
   type: "idle" | "good" | "dark" | "bright" | "small";
@@ -460,45 +461,73 @@ export default function AssessPage() {
                 <span>{t.photoTipsTitle}</span>
               </h3>
 
-              <div className="space-y-3 text-xs text-[#526373]">
-                <div className="flex items-start gap-3 p-3 rounded-2xl bg-[#f4fafc]">
+              <div className="space-y-2.5 text-xs text-[#526373]">
+                <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-[#f4fafc]">
                   <span className="material-symbols-outlined text-[#328493] text-lg shrink-0 mt-0.5">wb_sunny</span>
                   <div>
                     <h4 className="font-bold text-[#1c2834]">
-                      {language === "bn" ? "উজ্জ্বল প্রাকৃতিক আলো" : "Bright natural light"}
+                      {language === "bn" ? "দিনের আলো বা উজ্জ্বল প্রাকৃতিক আলো" : "Daylight preferred"}
                     </h4>
-                    <p className="text-[11px] mt-0.5">
+                    <p className="text-[11px] mt-0.5 text-slate-500">
                       {language === "bn"
-                        ? "দিনের আলোয় বা জানালার পাশে ছবি তুললে স্পষ্ট দেখা যায়।"
-                        : "Take the photo near a window or in daylight. Avoid dark shadows."}
+                        ? "দিনের আলোয় বা জানালার পাশে ছবি তুললে ত্বকের স্বাভাবিক রঙ ফুটে ওঠে।"
+                        : "Take the photo in daylight near a window for natural skin tones."}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-3 rounded-2xl bg-[#f4fafc]">
-                  <span className="material-symbols-outlined text-[#328493] text-lg shrink-0 mt-0.5">filter_center_focus</span>
-                  <div>
-                    <h4 className="font-bold text-[#1c2834]">
-                      {language === "bn" ? "কাছ থেকে পরিষ্কার ফোকাস" : "Clear, steady focus"}
-                    </h4>
-                    <p className="text-[11px] mt-0.5">
-                      {language === "bn"
-                        ? "ক্যামেরা ৪-৬ ইঞ্চি দূরত্বে রেখে স্ক্রিনে ট্যাপ করে ফোকাস করুন।"
-                        : "Hold camera 4 to 6 inches away. Tap your screen to focus on the area."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-2xl bg-[#f4fafc]">
+                <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-[#f4fafc]">
                   <span className="material-symbols-outlined text-[#328493] text-lg shrink-0 mt-0.5">flash_off</span>
                   <div>
                     <h4 className="font-bold text-[#1c2834]">
-                      {language === "bn" ? "ফ্ল্যাশ বন্ধ রাখুন" : "Turn flash off"}
+                      {language === "bn" ? "ফ্ল্যাশ বন্ধ রাখুন" : "No flash"}
                     </h4>
-                    <p className="text-[11px] mt-0.5">
+                    <p className="text-[11px] mt-0.5 text-slate-500">
                       {language === "bn"
-                        ? "ফ্ল্যাশের অতিরিক্ত আলো ত্বকের আসল বর্ণ বা বিবরণ ঢেকে দেয়।"
-                        : "Camera flash creates bright reflections that hide subtle skin details."}
+                        ? "ক্যামেরা ফ্ল্যাশ সাদা দাগ তৈরি করে ত্বকের গভীর বিবরণ নষ্ট করে।"
+                        : "Camera flash creates intense glare and obscures border details."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-[#f4fafc]">
+                  <span className="material-symbols-outlined text-[#328493] text-lg shrink-0 mt-0.5">lightbulb</span>
+                  <div>
+                    <h4 className="font-bold text-[#1c2834]">
+                      {language === "bn" ? "প্রাকৃতিক আলো না থাকলে উজ্জ্বল সাদা আলো" : "Otherwise bright white light"}
+                    </h4>
+                    <p className="text-[11px] mt-0.5 text-slate-500">
+                      {language === "bn"
+                        ? "হলুদ বা রঙিন বাল্বের বদলে ঘরে পর্যাপ্ত সাদা বাতি ব্যবহার করুন।"
+                        : "Use uniform white indoor room lighting if daylight is unavailable."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-[#f4fafc]">
+                  <span className="material-symbols-outlined text-[#328493] text-lg shrink-0 mt-0.5">filter_center_focus</span>
+                  <div>
+                    <h4 className="font-bold text-[#1c2834]">
+                      {language === "bn" ? "ক্যামেরা স্থির রাখুন (৪-৬ ইঞ্চি দূরত্ব)" : "Keep steady & focused"}
+                    </h4>
+                    <p className="text-[11px] mt-0.5 text-slate-500">
+                      {language === "bn"
+                        ? "হাত কাঁপাবেন না; স্ক্রিনে ফোকাস করে পরিষ্কার ছবি নিন।"
+                        : "Hold camera steady 4–6 inches away and tap to autofocus."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-[#f4fafc]">
+                  <span className="material-symbols-outlined text-[#328493] text-lg shrink-0 mt-0.5">crop_free</span>
+                  <div>
+                    <h4 className="font-bold text-[#1c2834]">
+                      {language === "bn" ? "সম্পূর্ণ ক্ষতিগ্রস্ত অংশ ফ্রেমের ভেতরে রাখুন" : "Show full area"}
+                    </h4>
+                    <p className="text-[11px] mt-0.5 text-slate-500">
+                      {language === "bn"
+                        ? "দাগ বা র্যাশের চারপাশের কিছুটা সুস্থ ত্বকও যেন ছবিতে দেখা যায়।"
+                        : "Include the full lesion border with a margin of surrounding normal skin."}
                     </p>
                   </div>
                 </div>
@@ -539,36 +568,13 @@ export default function AssessPage() {
       {currentStep === 2 && (
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="bg-white/90 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/80 shadow-xs space-y-6">
-            {/* 1. Body Location */}
+            {/* 1. Body Location - Interactive Anatomical Selector */}
             <div className="space-y-2.5">
-              <label className="block font-headline font-bold text-sm text-[#1c2834]">
-                {language === "bn"
-                  ? "১. শরীরের কোন স্থানে এই সমস্যাটি রয়েছে?"
-                  : "1. Where on your body is this skin concern located?"}
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {[
-                  "Face / Head",
-                  "Arm / Hand",
-                  "Chest / Back",
-                  "Leg / Foot",
-                  "Neck / Shoulders",
-                  "Other area",
-                ].map((loc) => (
-                  <button
-                    key={loc}
-                    type="button"
-                    onClick={() => setBodyLocation(loc)}
-                    className={`py-2.5 px-3 rounded-2xl font-headline text-xs font-bold text-center transition-all cursor-pointer ${
-                      bodyLocation === loc
-                        ? "bg-[#4da8b9] text-white shadow-xs"
-                        : "bg-[#f4fafc] hover:bg-[#e8f4f8] text-[#1c2834]"
-                    }`}
-                  >
-                    {loc}
-                  </button>
-                ))}
-              </div>
+              <BodyMapSelector
+                selectedLocation={bodyLocation}
+                onSelectLocation={(loc) => setBodyLocation(loc)}
+                language={language}
+              />
             </div>
 
             {/* 2. Duration */}

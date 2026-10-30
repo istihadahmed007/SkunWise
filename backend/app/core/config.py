@@ -12,10 +12,13 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "SkinWise AI"
     VERSION: str = "4.2.1-derm-triage"
     API_V1_STR: str = "/api"
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    SEED_DEMO_DATA: bool = os.getenv("SEED_DEMO_DATA", "false").lower() == "true"
     
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "skinwise-super-secret-clinical-key-2026-production-grade")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "skinwise-dev-clinical-insecure-key-change-in-production")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    GUEST_TOKEN_EXPIRE_MINUTES: int = 60 * 24       # 24 hours for guest assessments
     
     DATABASE_URL: str = os.getenv("DATABASE_URL", default_db)
     
@@ -34,7 +37,16 @@ class Settings(BaseSettings):
     MAX_GLARE_RATIO: float = 0.08
     
     # AI Engine Configuration
-    AI_MODEL_BACKBONE: str = "mobilenet_v3_small-derm-adapter"
+    AI_MODEL_BACKBONE: str = "gemini-3.5-flash-lite"
+    HF_TOKEN: str = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY", "")
+    HF_MODEL_ID: str = os.getenv("HF_MODEL_ID", "Jayanth2002/dinov2-base-finetuned-SkinDisease")
+    HF_ROUTER_URL: str = "https://router.huggingface.co/hf-inference/models"
+
+    # Public APIs (openFDA & Open-Meteo)
+    OPENFDA_API_KEY: str = os.getenv("OPENFDA_API_KEY", "")
+    OPENFDA_COSMETICS_URL: str = os.getenv("OPENFDA_COSMETICS_URL", "https://api.fda.gov/cosmetic/event.json")
+    OPEN_METEO_UV_URL: str = os.getenv("OPEN_METEO_UV_URL", "https://api.open-meteo.com/v1/forecast")
+    
     SUPPORTED_CATEGORIES: List[str] = [
         "eczema_contact_dermatitis",
         "acne_vulgaris",
@@ -55,6 +67,19 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 settings = Settings()
+
+# Enforce secure SECRET_KEY in production environments
+if settings.ENVIRONMENT.lower() == "production":
+    insecure_keys = [
+        "skinwise-dev-clinical-insecure-key-change-in-production",
+        "skinwise-super-secret-clinical-key-2026-production-grade",
+        "replace_with_a_secure_random_64_char_key_for_production"
+    ]
+    if not settings.SECRET_KEY or len(settings.SECRET_KEY.strip()) < 32 or settings.SECRET_KEY in insecure_keys:
+        raise RuntimeError(
+            "CRITICAL SECURITY CONFIGURATION ERROR: A high-entropy, production-grade SECRET_KEY "
+            "(at least 32 characters) must be configured in environment variables for production."
+        )
 
 # Ensure directories exist
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

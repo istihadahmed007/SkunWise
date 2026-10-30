@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { api, SymptomInput } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 import { BodyMapSelector } from "@/components/BodyMapSelector";
@@ -50,6 +49,7 @@ export default function AssessPage() {
   // Step 3: Loading & submission state
   const [loadingStage, setLoadingStage] = useState<number>(1);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Query parameter handling from homepage quick concern buttons
   useEffect(() => {
@@ -195,11 +195,12 @@ export default function AssessPage() {
   };
 
   const submitAssessment = async () => {
-    if (!selectedFile) {
-      setCurrentStep(1);
+    if (!selectedFile || isSubmitting) {
+      if (!selectedFile) setCurrentStep(1);
       return;
     }
 
+    setIsSubmitting(true);
     setCurrentStep(3);
     setLoadingStage(1);
     setAnalysisError(null);
@@ -249,6 +250,8 @@ export default function AssessPage() {
             ? "যাচাই প্রক্রিয়া সম্পন্ন হতে পারেনি। অনুগ্রহ করে আবার চেষ্টা করুন।"
             : "We were unable to complete your skin check. Please try again.")
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -325,14 +328,14 @@ export default function AssessPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleInputChange}
               className="hidden"
             />
             <input
               ref={cameraInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               capture="environment"
               onChange={handleInputChange}
               className="hidden"
@@ -362,8 +365,8 @@ export default function AssessPage() {
                 </h3>
                 <p className="text-xs text-[#526373] mt-1 max-w-xs">
                   {language === "bn"
-                    ? "কম্পিউটার বা ফোন থেকে ছবি নির্বাচন করুন (JPG, PNG, HEIC)"
-                    : "Tap to browse files or drop a clear image here (JPG, PNG, HEIC)"}
+                    ? "কম্পিউটার বা ফোন থেকে ছবি নির্বাচন করুন (JPG, PNG, WebP)"
+                    : "Tap to browse files or drop a clear image here (JPG, PNG, WebP)"}
                 </p>
               </div>
             ) : (

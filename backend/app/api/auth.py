@@ -1,9 +1,10 @@
 import hashlib
 from datetime import datetime, timezone
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.core.rate_limiter import auth_rate_limiter, register_rate_limiter
 from app.models.schemas import (
@@ -301,14 +302,33 @@ def delete_account(
     return {"status": "success", "message": "Account and all associated dermatological data have been permanently purged."}
 
 
-@router.post("/retention/cleanup")
-def run_retention_cleanup(
+@router.post("/retention/cleanup-my-records")
+def cleanup_my_records(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Executes automated data retention lifecycle cleanup:
-    Purges expired images and records exceeding configured retention windows.
+    Patient self-service retention scrubbing:
+    Safely cleans up expired assessments belonging to the authenticated user only.
+    Guarantees user-level isolation: cannot delete or observe other patients' records.
     """
-    result = retention_service.cleanup_expired_records(db)
-    return result
+    return retention_service.cleanup_user_expired_records(db, user)
+
+
+@router.post("/retention/worker-cleanup")
+def run_worker_retention_cleanup(
+    x_worker_secret: Optional[str] = Header(None, alias="X-Worker-Secret"),
+    db: Session = Depends(get_db)
+):
+    """
+    Internal administrative/worker-only retention job:
+    Requires secret authorization header (X-Worker-Secret).
+    Regular authenticated users are rejected with HTTP 403 Forbidden.
+    """
+    configured_secret = getattr(settings, "WORKER_SECRET", "")
+    if not configured_secret or not x_worker_secret or x_worker_secret != configured_secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden. Global retention cleanup requires internal worker authorization."
+        )
+    return retention_service.cleanup_expired_records(db)

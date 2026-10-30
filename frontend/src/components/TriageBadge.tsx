@@ -8,7 +8,7 @@ interface TriageBadgeProps {
   size?: "sm" | "md" | "lg";
 }
 
-export const TriageBadge: React.FC<TriageBadgeProps> = ({ tier, label, title, badgeColor, size = "md" }) => {
+export const TriageBadge: React.FC<TriageBadgeProps> = ({ tier, label, title, size = "md" }) => {
   let bgClass = "bg-surface-container-high text-on-surface";
   let dotClass = "bg-secondary";
   let text = title || label || "Assessment Pending";

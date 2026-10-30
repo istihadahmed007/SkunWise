@@ -14,7 +14,9 @@ def test_emergency_override_takes_precedence_over_benign_visual():
         pain_score=4,
         is_spreading=True,
         has_facial_or_throat_swelling=True,
-        has_breathing_difficulty=True
+        has_breathing_difficulty=True,
+        consent_biometric=True,
+        consent_disclaimer=True
     )
     
     # Fake reassuring visual output
@@ -44,7 +46,9 @@ def test_fever_and_spreading_escalation():
         itch_score=2,
         pain_score=7,
         is_spreading=True,
-        has_fever_or_chills=True
+        has_fever_or_chills=True,
+        consent_biometric=True,
+        consent_disclaimer=True
     )
     
     pathway = triage_service.determine_care_pathway(
@@ -59,7 +63,12 @@ def test_fever_and_spreading_escalation():
 
 def test_quality_rejection_routes_to_doctor_recommendation():
     """Inconclusive or poor quality images must not give false reassurance."""
-    symptoms = SymptomQuestionnaireInput(duration_days=3, itch_score=1)
+    symptoms = SymptomQuestionnaireInput(
+        duration_days=3,
+        itch_score=1,
+        consent_biometric=True,
+        consent_disclaimer=True
+    )
     
     pathway = triage_service.determine_care_pathway(
         symptoms=symptoms,
@@ -79,7 +88,9 @@ def test_mild_presentation_routes_to_tier_1():
         itch_score=2,
         pain_score=0,
         is_spreading=False,
-        bleeding_or_crusting=False
+        bleeding_or_crusting=False,
+        consent_biometric=True,
+        consent_disclaimer=True
     )
     
     mild_visual = {

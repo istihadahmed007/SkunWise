@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     SEED_DEMO_DATA: bool = os.getenv("SEED_DEMO_DATA", "false").lower() == "true"
     
+    WORKER_SECRET: str = os.getenv("WORKER_SECRET", "skinwise-local-worker-secret-internal-use-only")
+    BEHIND_TRUSTED_PROXY: bool = os.getenv("BEHIND_TRUSTED_PROXY", "false").lower() == "true"
+    TRUSTED_PROXIES: List[str] = [x.strip() for x in os.getenv("TRUSTED_PROXIES", "127.0.0.1,::1").split(",") if x.strip()]
+    
     SECRET_KEY: str = os.getenv("SECRET_KEY", "skinwise-dev-clinical-insecure-key-change-in-production")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
@@ -68,17 +72,25 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Enforce secure SECRET_KEY in production environments
-if settings.ENVIRONMENT.lower() == "production":
+# Enforce secure SECRET_KEY in all non-development/test deployments (Fail-closed)
+env_normalized = settings.ENVIRONMENT.lower().strip()
+if env_normalized not in ("development", "test"):
     insecure_keys = [
         "skinwise-dev-clinical-insecure-key-change-in-production",
         "skinwise-super-secret-clinical-key-2026-production-grade",
-        "replace_with_a_secure_random_64_char_key_for_production"
+        "replace_with_a_secure_random_64_char_key_for_production",
+        "secret",
+        "changeme"
     ]
-    if not settings.SECRET_KEY or len(settings.SECRET_KEY.strip()) < 32 or settings.SECRET_KEY in insecure_keys:
+    if (
+        not settings.SECRET_KEY
+        or len(settings.SECRET_KEY.strip()) < 32
+        or settings.SECRET_KEY in insecure_keys
+        or "change-in-production" in settings.SECRET_KEY
+    ):
         raise RuntimeError(
             "CRITICAL SECURITY CONFIGURATION ERROR: A high-entropy, production-grade SECRET_KEY "
-            "(at least 32 characters) must be configured in environment variables for production."
+            "(at least 32 characters) must be configured in environment variables for non-development environments."
         )
 
 # Ensure directories exist

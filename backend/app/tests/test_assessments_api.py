@@ -3,12 +3,15 @@ import json
 from app.tests.test_image_quality import create_synthetic_image
 
 def test_full_skin_analyze_and_retrieve_flow(client):
-    # 1. Register user
+    # 1. Register user with affirmative explicit consent
     reg = client.post("/api/auth/register", json={
         "email": "clinical.flow@example.com",
         "password": "Password123!",
-        "full_name": "Clinical Patient"
+        "full_name": "Clinical Patient",
+        "consent_biometric": True,
+        "consent_disclaimer": True
     })
+    assert reg.status_code == 200, f"Register failed: {reg.text}"
     token = reg.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -25,7 +28,9 @@ def test_full_skin_analyze_and_retrieve_flow(client):
         "exposure_details": "New botanical soap",
         "has_fever_or_chills": False,
         "has_facial_or_throat_swelling": False,
-        "has_breathing_difficulty": False
+        "has_breathing_difficulty": False,
+        "consent_biometric": True,
+        "consent_disclaimer": True
     }
 
     files = {
@@ -33,7 +38,9 @@ def test_full_skin_analyze_and_retrieve_flow(client):
     }
     data = {
         "symptoms_json": json.dumps(symptoms),
-        "anatomical_region": "Right Volar Forearm"
+        "anatomical_region": "Right Volar Forearm",
+        "consent_biometric": "true",
+        "consent_disclaimer": "true"
     }
 
     res = client.post("/api/skin/analyze", files=files, data=data, headers=headers)

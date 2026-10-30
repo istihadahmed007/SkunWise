@@ -92,7 +92,7 @@ export const UVGuidanceCard: React.FC = () => {
             </div>
 
             <div className="bg-[#f0f8fb] p-4 rounded-2xl border border-[#d1e5ec]">
-              <span className="text-xs text-slate-500 font-medium">Today's Peak UV</span>
+              <span className="text-xs text-slate-500 font-medium">Today&apos;s Peak UV</span>
               <div className="text-2xl font-extrabold text-slate-900 mt-1">
                 {uvData.max_uv_today}
               </div>

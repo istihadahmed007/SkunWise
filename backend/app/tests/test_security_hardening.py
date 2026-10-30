@@ -160,7 +160,12 @@ def test_file_signature_magic_bytes_validation(client):
     # Spoofed file: 2KB text/script masquerading as .jpg (exceeds 1KB min size)
     fake_jpeg_content = b"#!/bin/bash\necho 'malicious payload'\n" + b"X" * 2048
     files = {"file": ("malicious.jpg", io.BytesIO(fake_jpeg_content), "image/jpeg")}
-    symptoms = {"anatomical_region": "Arm", "duration_days": 2}
+    symptoms = {
+        "anatomical_region": "Arm",
+        "duration_days": 2,
+        "consent_biometric": True,
+        "consent_disclaimer": True
+    }
     data = {
         "symptoms_json": json.dumps(symptoms),
         "anatomical_region": "Arm",
@@ -242,3 +247,182 @@ def test_bangladesh_provider_directory(client):
     assert "consultation_fee_bdt" in first_provider
     assert "services" in first_provider
     assert len(first_provider["services"]) > 0
+
+
+def test_retention_authorization_worker_and_user_isolation(client):
+    """Verify global retention cleanup is locked to X-Worker-Secret, while users have self-cleanup."""
+    # 1. Unauthenticated or wrong secret gets 403
+    unauth_res = client.post("/api/auth/retention/worker-cleanup")
+    assert unauth_res.status_code == 403
+    assert "worker authorization" in unauth_res.json()["detail"].lower()
+
+    bad_res = client.post(
+        "/api/auth/retention/worker-cleanup",
+        headers={"X-Worker-Secret": "invalid-secret-key"}
+    )
+    assert bad_res.status_code == 403
+
+    # 2. Worker with correct secret succeeds
+    from app.core.config import settings
+    worker_res = client.post(
+        "/api/auth/retention/worker-cleanup",
+        headers={"X-Worker-Secret": settings.WORKER_SECRET}
+    )
+    assert worker_res.status_code == 200
+    assert "expired_assessments_count" in worker_res.json()
+
+    # 3. User self-service cleanup
+    reg = client.post("/api/auth/register", json={
+        "email": "user.cleanup@example.com",
+        "password": "Password123!",
+        "full_name": "Cleanup User",
+        "consent_biometric": True,
+        "consent_disclaimer": True
+    })
+    token = reg.json()["access_token"]
+    user_cleanup_res = client.post(
+        "/api/auth/retention/cleanup-my-records",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert user_cleanup_res.status_code == 200
+    assert "expired_assessments_count" in user_cleanup_res.json()
+
+
+def test_affirmative_explicit_consent_enforcement(client):
+    """Verify that omission or denial of biometric consent or disclaimer is rejected."""
+    # 1. Omitted consent on registration -> HTTP 422
+    omitted_reg = client.post("/api/auth/register", json={
+        "email": "noconsent@example.com",
+        "password": "Password123!",
+        "full_name": "No Consent"
+    })
+    assert omitted_reg.status_code == 422
+
+    # 2. Explicit False consent on registration -> HTTP 400
+    denied_reg = client.post("/api/auth/register", json={
+        "email": "denied@example.com",
+        "password": "Password123!",
+        "full_name": "Denied Consent",
+        "consent_biometric": False,
+        "consent_disclaimer": True
+    })
+    assert denied_reg.status_code == 400
+    assert "biometric intake consent" in denied_reg.json()["detail"].lower()
+
+    # 3. Denied disclaimer on analysis -> HTTP 400
+    image_bytes = create_synthetic_image(sharp=True)
+    files = {"file": ("test.jpg", io.BytesIO(image_bytes), "image/jpeg")}
+    symptoms = {
+        "anatomical_region": "Arm",
+        "duration_days": 2,
+        "consent_biometric": True,
+        "consent_disclaimer": False
+    }
+    data = {
+        "symptoms_json": json.dumps(symptoms),
+        "anatomical_region": "Arm",
+        "consent_biometric": "true",
+        "consent_disclaimer": "false"
+    }
+    denied_analysis = client.post("/api/skin/analyze", files=files, data=data)
+    assert denied_analysis.status_code == 400
+    assert "mandatory consent missing" in denied_analysis.json()["detail"].lower()
+
+
+def test_heic_image_actionable_error_message(client):
+    """Verify uploading Apple HEIC files returns a helpful error with conversion instructions."""
+    # Simulated HEIC ftyp header (ftypheic)
+    heic_bytes = b"\x00\x00\x00\x18ftypheic" + b"\x00" * 2048
+    files = {"file": ("photo.heic", io.BytesIO(heic_bytes), "image/heic")}
+    symptoms = {
+        "anatomical_region": "Leg",
+        "duration_days": 1,
+        "consent_biometric": True,
+        "consent_disclaimer": True
+    }
+    data = {
+        "symptoms_json": json.dumps(symptoms),
+        "anatomical_region": "Leg",
+        "consent_biometric": "true",
+        "consent_disclaimer": "true"
+    }
+    res = client.post("/api/skin/analyze", files=files, data=data)
+    assert res.status_code == 400
+    detail = res.json()["detail"].lower()
+    assert "heic" in detail or "heif" in detail
+    assert "jpeg" in detail or "png" in detail or "webp" in detail
+
+
+def test_complete_patient_data_export(client):
+    """Verify complete clinical data export returns full questionnaire, audit logs, and assessments."""
+    reg = client.post("/api/auth/register", json={
+        "email": "export.patient@example.com",
+        "password": "Password123!",
+        "full_name": "Export Patient",
+        "consent_biometric": True,
+        "consent_disclaimer": True
+    })
+    token = reg.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Create assessment
+    image_bytes = create_synthetic_image(sharp=True)
+    files = {"file": ("spot.jpg", io.BytesIO(image_bytes), "image/jpeg")}
+    symptoms = {
+        "anatomical_region": "Neck",
+        "duration_days": 4,
+        "itch_score": 3,
+        "pain_score": 1,
+        "consent_biometric": True,
+        "consent_disclaimer": True
+    }
+    data = {
+        "symptoms_json": json.dumps(symptoms),
+        "anatomical_region": "Neck",
+        "consent_biometric": "true",
+        "consent_disclaimer": "true"
+    }
+    client.post("/api/skin/analyze", files=files, data=data, headers=headers)
+
+    # Perform full export
+    export_res = client.get("/api/skin/export/complete", headers=headers)
+    assert export_res.status_code == 200
+    export_data = export_res.json()
+
+    assert "export_metadata" in export_data
+    assert export_data["export_metadata"]["patient_email"] == "export.patient@example.com"
+    assert "consent_history" in export_data
+    assert len(export_data["consent_history"]) >= 1
+    assert "assessments" in export_data
+    assert len(export_data["assessments"]) >= 1
+    assert export_data["assessments"][0]["anatomical_region"] == "Neck"
+
+
+def test_standardized_demo_account(client):
+    """Verify the single source-of-truth demo account is accessible."""
+    demo_email = "sarah.jenkins@example.com"
+    demo_password = "SkinWise2026!"
+
+    # Try logging in directly (in case seeded)
+    login_res = client.post("/api/auth/login", json={
+        "email": demo_email,
+        "password": demo_password
+    })
+    if login_res.status_code != 200:
+        # Register if not auto-seeded in test DB
+        reg_res = client.post("/api/auth/register", json={
+            "email": demo_email,
+            "password": demo_password,
+            "full_name": "Dr. Sarah Jenkins",
+            "consent_biometric": True,
+            "consent_disclaimer": True
+        })
+        assert reg_res.status_code == 200
+        login_res = client.post("/api/auth/login", json={
+            "email": demo_email,
+            "password": demo_password
+        })
+
+    assert login_res.status_code == 200
+    assert "access_token" in login_res.json()
+

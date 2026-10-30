@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api, User } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
 export default function SettingsPage() {
   const { user, isAuthenticated, loading: authLoading, logout, refreshUser } = useAuth();
-  const { t, language } = useLanguage();
+  const { language } = useLanguage();
   const router = useRouter();
 
   const [fullName, setFullName] = useState("");
@@ -60,29 +60,18 @@ export default function SettingsPage() {
 
   async function handleExportJson() {
     try {
-      const history = await api.getAssessmentHistory();
-      const exportData = {
-        exported_at: new Date().toISOString(),
-        user_profile: {
-          id: user?.id,
-          email: user?.email,
-          full_name: user?.full_name,
-        },
-        assessments_count: history.length,
-        assessments: history,
-      };
-
+      const exportData = await api.exportCompleteData();
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `skinwise_data_export_${user?.id || "user"}.json`;
+      a.download = `skinwise_complete_export_${user?.id || "user"}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert("Failed to export data: " + err.message);
+      alert("Failed to export complete data: " + err.message);
     }
   }
 
@@ -187,10 +176,10 @@ export default function SettingsPage() {
               <div>
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#2b7f8f]">photo_filter</span>
-                  <span>Automatic Photo Scrubbing</span>
+                  <span>Delete uploaded photo immediately after analysis</span>
                 </h2>
                 <p className="text-sm text-slate-600 mt-1 max-w-xl">
-                  When enabled, uploaded skin photos are permanently removed from the server immediately after image analysis completes. Only your non-image assessment notes are preserved.
+                  When enabled, your uploaded photograph is processed on the server to extract visual observations and then immediately deleted from server storage. Non-image symptom notes, responses, and care guidance remain in your account until you delete them.
                 </p>
               </div>
 

@@ -116,8 +116,8 @@ class UserRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
     full_name: str = Field("Patient User", min_length=2)
-    consent_biometric: bool = Field(True, description="Explicit consent to process skin image")
-    consent_disclaimer: bool = Field(True, description="Acknowledgment that SkinWise AI is not a definitive diagnosis")
+    consent_biometric: bool = Field(..., description="Explicit affirmative consent to process dermatological photography")
+    consent_disclaimer: bool = Field(..., description="Explicit affirmative acknowledgment that SkinWise AI is informational and non-diagnostic")
 
 class UserLoginRequest(BaseModel):
     email: EmailStr
@@ -159,9 +159,9 @@ class SymptomQuestionnaireInput(BaseModel):
     midday_skin_feel: Optional[str] = Field("balanced", description="midday skin feel: oily, dry, combination, balanced")
     skin_sensitivity: Optional[str] = Field("rarely_reacts", description="skin reaction tendency: easily_irritated, rarely_reacts")
     
-    # Explicit Biometric & Medical Disclaimer Consent (Mandatory for Intake)
-    consent_biometric: bool = Field(True, description="Explicit consent to analyze skin photography")
-    consent_disclaimer: bool = Field(True, description="Acknowledgment that SkinWise AI is informational and non-diagnostic")
+    # Explicit Biometric & Medical Disclaimer Consent (Mandatory for Intake - No Affirmative Default)
+    consent_biometric: bool = Field(..., description="Explicit affirmative consent to analyze skin photography")
+    consent_disclaimer: bool = Field(..., description="Explicit affirmative acknowledgment that SkinWise AI is informational and non-diagnostic")
 
     # Critical Red-Flag Systemic Emergency Questions
     has_fever_or_chills: bool = Field(False, description="Systemic fever > 100.4F / 38C")

@@ -4,6 +4,8 @@ export const translations = {
   en: {
     medicalNotice: "SkinWise provides educational guidance and symptom triage. It does NOT diagnose conditions or replace a qualified medical doctor.",
     emergencyBtn: "Urgent Warning Signs",
+    emergencyNotice: "Urgent Warning Signs",
+    analyzeMySkin: "Analyze My Skin",
     emergencyTitle: "When to Seek Emergency Care Immediately",
     emergencyDesc: "If you are experiencing any of the following symptoms, please do not use this app. Go to the nearest emergency room or call emergency services (e.g. 911, 112, 999) immediately:",
     emergencyList: [
@@ -90,6 +92,8 @@ export const translations = {
   bn: {
     medicalNotice: "স্কিনওয়াইজ তথ্য ও সাধারণ সচেতনতামূলক পরামর্শ দেয়। এটি কোনো রোগ নির্ণয় করে না এবং ডাক্তারের বিকল্প নয়।",
     emergencyBtn: "জরুরি বিপদচিহ্ন",
+    emergencyNotice: "জরুরি সতর্কবার্তা",
+    analyzeMySkin: "ত্বক বিশ্লেষণ করুন",
     emergencyTitle: "কখন অবিলম্বে জরুরি চিকিৎসা নেবেন",
     emergencyDesc: "যদি আপনার নিম্নে বর্ণিত কোনো লক্ষণ থাকে, তবে এই অ্যাপ ব্যবহার করবেন না। অবিলম্বে নিকটস্থ হাসপাতালের জরুরি বিভাগে যান বা জরুরি নম্বরে কল করুন:",
     emergencyList: [

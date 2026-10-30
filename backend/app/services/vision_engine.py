@@ -302,50 +302,54 @@ Respond strictly with valid JSON conforming to this schema:
         # 3. Multimodal Model Inference
         gemini_result = self._infer_with_gemini(image_bytes)
 
-        # 4. Calibrated Probabilities & Bounding Box
+        # 4. Uncalibrated Heuristic Pattern Scores & Spatial Localization
+        # Note: These are heuristic visual similarity scores from multimodal prompting,
+        # NOT clinically validated, calibrated disease probabilities.
         raw_scores = {k: 0.10 for k in SUPPORTED_CONDITIONS}
 
         if gemini_result and gemini_result.get("matched_category") in raw_scores:
             matched_cat = gemini_result["matched_category"]
             raw_scores[matched_cat] = 0.70
 
-            # Distribute remaining probability evenly
+            # Distribute remaining heuristic weight evenly
             remaining = (1.0 - 0.70) / (len(raw_scores) - 1)
             for k in raw_scores:
                 if k != matched_cat:
                     raw_scores[k] = remaining
 
-            calibrated_probs = {k: round(v, 4) for k, v in raw_scores.items()}
-            sorted_predictions = sorted(calibrated_probs.items(), key=lambda x: x[1], reverse=True)
-            top1_prob = sorted_predictions[0][1]
-            top2_prob = sorted_predictions[1][1]
-            margin = round(top1_prob - top2_prob, 3)
+            pattern_scores = {k: round(v, 4) for k, v in raw_scores.items()}
+            sorted_predictions = sorted(pattern_scores.items(), key=lambda x: x[1], reverse=True)
+            top1_score = sorted_predictions[0][1]
+            top2_score = sorted_predictions[1][1]
+            margin = round(top1_score - top2_score, 3)
             normalized_entropy = 0.52
             is_ood = False
             uncertainty_level = gemini_result.get("confidence_assessment", "Moderate")
             uncertainty_rationale = gemini_result.get(
                 "uncertainty_rationale",
-                "Automated visual pattern match. Medical evaluation required for clinical diagnosis."
+                "Automated visual pattern observation. Uncalibrated heuristic score. Medical evaluation required for clinical diagnosis."
             )
 
         elif self.is_configured():
             # Gemini was configured but inference returned inconclusive or network failed
-            calibrated_probs = {k: round(1.0 / len(raw_scores), 4) for k in raw_scores}
-            sorted_predictions = list(calibrated_probs.items())
+            pattern_scores = {k: round(1.0 / len(raw_scores), 4) for k in raw_scores}
+            sorted_predictions = list(pattern_scores.items())
             margin = 0.0
             normalized_entropy = 1.0
             is_ood = True
             uncertainty_level = "Inconclusive"
-            uncertainty_rationale = "Image analysis was inconclusive. The visual characteristics could not be reliably categorized."
+            uncertainty_rationale = "Image analysis was inconclusive. The visual characteristics could not be reliably categorized. Clinical validation required."
         else:
             # No remote AI model configured: report honest baseline without pretending to have a clinical model
-            calibrated_probs = {k: round(1.0 / len(raw_scores), 4) for k in raw_scores}
-            sorted_predictions = list(calibrated_probs.items())
+            pattern_scores = {k: round(1.0 / len(raw_scores), 4) for k in raw_scores}
+            sorted_predictions = list(pattern_scores.items())
             margin = 0.0
             normalized_entropy = 1.0
             is_ood = True
             uncertainty_level = "Inconclusive"
             uncertainty_rationale = "Automated AI classification is offline. Assessment is based on symptom questionnaire and conservative self-care guidance."
+
+        calibrated_probs = pattern_scores
 
         # 5. Detected Area Object
         detected_area: Dict[str, Any] = {
@@ -385,7 +389,11 @@ Respond strictly with valid JSON conforming to this schema:
             "backend": self.backend_type,
             "skin_detection": skin_metrics,
             "morphological_features": features,
-            "calibrated_probabilities": calibrated_probs,
+            "observed_pattern_scores": calibrated_probs,
+            "calibrated_probabilities": calibrated_probs,  # Retained as alias for triage routing
+            "is_uncalibrated_heuristic": True,
+            "is_clinical_probability": False,
+            "clinical_disclaimer": "Heuristic pattern similarity score only; not a clinically calibrated probability.",
             "top_predictions": sorted_predictions,
             "detected_area": detected_area,
             "ai_observations": gemini_result.get("observed_patterns", []) if gemini_result else [],

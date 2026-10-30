@@ -476,6 +476,17 @@ export const api = {
     return res.json();
   },
 
+  async exportCompleteData(): Promise<any> {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/skin/export/complete`, {
+      headers: getAuthHeader(),
+    });
+    if (!res.ok) {
+      throw new Error("Failed to export complete patient records");
+    }
+    return res.json();
+  },
+
   async getHealth() {
     const base = getApiBaseUrl();
     const res = await fetch(`${base}/health`);

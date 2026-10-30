@@ -2,7 +2,7 @@ import io
 import hashlib
 from typing import Tuple, Optional
 from PIL import Image, ImageOps
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 from app.core.config import settings
 
 # Protect against decompression bombs / resource exhaustion DoS
@@ -11,6 +11,31 @@ Image.MAX_IMAGE_PIXELS = 25_000_000
 MAX_DIMENSION = 6000
 MIN_DIMENSION = 200
 MAX_ASPECT_RATIO = 5.0
+
+async def read_stream_with_byte_limit(file: UploadFile, max_bytes: Optional[int] = None) -> bytes:
+    """
+    Streams file upload in 64KB chunks while actively counting bytes.
+    Aborts immediately with HTTP 413 if upload exceeds limit BEFORE buffering
+    the remainder into server memory.
+    """
+    limit = max_bytes or settings.MAX_FILE_SIZE_BYTES
+    chunks = []
+    total_bytes = 0
+    chunk_size = 64 * 1024  # 64 KB
+
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total_bytes += len(chunk)
+        if total_bytes > limit:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Uploaded file exceeds maximum allowed limit of {limit // (1024 * 1024)}MB."
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
 
 def compute_sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -37,6 +62,13 @@ def validate_magic_bytes(data: bytes) -> str:
     # WebP signature: RIFF....WEBP
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "WEBP"
+
+    # Actionable detection for HEIC/HEIF uploads
+    if b"ftypheic" in data[:24] or b"ftypmif1" in data[:24] or b"ftypmsf1" in data[:24]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="HEIC/HEIF format is not supported directly. Please convert your photo to JPEG, PNG, or WebP, or take a photo directly with your camera."
+        )
 
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,

@@ -1,8 +1,16 @@
-# SkinWise AI — Production-Grade Dermatological Triage Platform
+# SkinWise AI — Supportive Dermatology Triage & Symptom Guidance
 
-An evidence-based, medically audited, SaMD CE Class I aligned skin health assessment web application built with **Next.js 14 App Router (TypeScript)**, **Tailwind CSS**, and **Python FastAPI**.
+An informational, non-diagnostic skin health assessment web application built with **Next.js 14 App Router (TypeScript)**, **Tailwind CSS**, and **Python FastAPI**.
 
-Developed strictly against the approved **Google Stitch UI Specification** (`projects/2973201184690865371`, "SkinWise AI Platform Design").
+> [!WARNING]
+> **IMPORTANT REGULATORY & CLINICAL SAFETY NOTICE**
+> SkinWise AI is an educational and supportive symptom guidance prototype. It is **NOT** a certified medical device (SaMD), is **NOT** CE-marked under EU MDR, has **NOT** received FDA 510(k) clearance, and has **NOT** undergone formal external clinical trial audit. 
+> 
+> Automated unit test suites alone do not establish clinical safety. Before any real-world clinical deployment:
+> 1. Intended use, clinical risk analysis (ISO 14971), and hazard controls must be formally defined with qualified dermatologists.
+> 2. The computer-vision pipeline must be evaluated on an independent, representative dataset covering diverse Fitzpatrick skin phototypes (I through VI), real-world lighting variations, and artifact conditions.
+> 3. Clinical sensitivity for urgent conditions (such as melanocytic atypia and acute dermatoses), model calibration, subgroup performance, and failure modes must be formally measured and documented.
+> 4. Formal clinical governance, post-market surveillance, and change-control procedures must be implemented.
 
 ---
 
@@ -10,58 +18,60 @@ Developed strictly against the approved **Google Stitch UI Specification** (`pro
 
 ```mermaid
 flowchart TD
-    User([Patient / Clinical User]) -->|HTTPS / TLS| FE[Next.js 14 App Router Frontend]
+    User([Patient / User]) -->|HTTPS / TLS| FE[Next.js 14 App Router Frontend]
     FE -->|REST API + JWT Auth| BE[FastAPI Python Backend]
     
     subgraph Frontend [Next.js 14 Client]
-        FE --> UI_A[Screen A: Landing & Trust HUD]
-        FE --> UI_B[Screen B: Auth & Biometric Consent]
-        FE --> UI_C[Screen C: Patient Dashboard]
-        FE --> UI_D[Screen D/E/F: Guided Intake & Symptoms]
-        FE --> UI_G[Screen G: Clinical Dossier & Findings]
-        FE --> UI_H[Screen H: Longitudinal Lesion Tracker]
-        FE --> UI_I[Screen I: Privacy & Zero-Cloud Settings]
-        FE --> UI_J[Screen J: Specialist Referral & Telehealth]
+        FE --> UI_A[Screen A: Landing & Education]
+        FE --> UI_B[Screen B: Auth & Explicit Consent]
+        FE --> UI_C[Screen C: User Dashboard]
+        FE --> UI_D[Screen D/E: Body Map & Symptom Intake]
+        FE --> UI_G[Screen G: Summary Dossier & Care Guidance]
+        FE --> UI_H[Screen H: Observation History]
+        FE --> UI_I[Screen I: Ephemeral Photo Storage Settings]
+        FE --> UI_J[Screen J: Specialist Referral Directory]
     end
 
-    subgraph Backend [FastAPI Clinical Services]
+    subgraph Backend [FastAPI Services]
         BE --> AuthServ[Auth & Consent Service]
-        BE --> ImgVal[MIME & EXIF Sanitization Service]
+        BE --> ImgVal[Streaming Validation & EXIF Sanitization]
         BE --> OpticQ[Laplacian & Photometric Quality Gating]
         BE --> VisEngine[Vision Model Adapter & Morphometry]
-        BE --> TriageEng[Independent Clinical Triage Engine]
+        BE --> TriageEng[Rule-Based Safety Triage Engine]
         BE --> RecEng[Guideline Knowledge Base RAG]
-        BE --> PDFGen[HL7/FHIR ReportLab Dossier Engine]
+        BE --> PDFGen[Clinical Summary Dossier Engine]
     end
 
     subgraph Storage [Secure Persistence & Storage]
         BE --> DB[(SQLite / PostgreSQL via SQLAlchemy)]
-        BE --> PrivStore[Private Image Store / Zero-Cloud Purge]
+        BE --> PrivStore[Private Image Store / Ephemeral Deletion]
     end
 ```
 
 ---
 
-## 🩺 Clinical & Regulatory Principles
+## 🩺 Operational Principles
 
-1. **Informational Triage, Non-Diagnostic SaMD**:
-   - Explicitly designed as a CE Class I clinical decision support aid.
-   - It does **not** provide definitive diagnoses or replace in-person dermatological consultations.
+1. **Informational Triage, Non-Diagnostic Decision Support**:
+   - Designed to provide supportive general skincare guidance and assist patients in preparing for in-person doctor visits.
+   - It does **not** provide definitive diagnoses, prescriptions, or replace in-person medical consultations.
 2. **Deterministic Emergency Precedence**:
-   - Clinical red flags (anaphylaxis signs, facial/lip swelling, respiratory distress, petechiae, fever with rapidly spreading rash, widespread peeling skin) trigger immediate Tier 3 emergency escalation.
-   - Emergency signs take **absolute precedence** over reassuring image-classification scores.
+   - Clinical red flags (anaphylaxis signs, facial/lip swelling, respiratory distress, petechiae, fever with rapidly spreading rash, widespread peeling skin) trigger immediate emergency escalation.
+   - Emergency signs take **absolute precedence** over visual pattern observations.
 3. **Optical Viability Quality Gating**:
-   - Every submitted dermoscopic photograph undergoes automated quality checks before clinical evaluation:
+   - Submitted photographs undergo quality checks before analysis:
      - **Focus / Sharpness**: Laplacian variance threshold ($\ge 50.0$).
      - **Lighting / Illumination**: Photometric perceived luminance ($\ge 35.0$ lux equivalent).
      - **Specular Flash Glare**: Glare ratio ceiling ($\le 18\%$).
-   - Blurry or underexposed imagery triggers explicit user guidance rather than hallucinated classifications.
-4. **Zero-Cloud Image Scrubbing & HIPAA/GDPR Compliance**:
-   - Zero-cloud retention mode permanently expunges raw imagery from disk immediately post-inference.
-   - EXIF metadata (GPS location, camera serials, timestamps) is stripped upon intake.
-   - Full patient self-deletion and JSON data portability endpoints.
-5. **Traceable Clinical Evidence**:
-   - All care pathways reference accredited sources: **American Academy of Dermatology (AAD)**, **British Association of Dermatologists (BAD)**, **DermNet NZ**, **WHO**, and **NCCN**.
+   - Blurry or underexposed imagery triggers explicit user guidance rather than speculative classifications.
+4. **Heuristic Visual Pattern Scores (Not Calibrated Probabilities)**:
+   - Visual pattern scores represent uncalibrated heuristic similarity from an experimental multimodal vision model, not clinically validated disease probabilities. When visual models are unavailable, the system reports an explicit inconclusive state.
+5. **Ephemeral Photo Deletion & Privacy Controls**:
+   - Optional ephemeral image mode permanently deletes the uploaded photo file from disk immediately after visual feature extraction, retaining only non-image symptom responses and care guidance.
+   - EXIF metadata (GPS coordinates, camera identifiers, timestamps) is stripped upon intake.
+   - Full patient self-service data export (`GET /api/skin/export/complete`) and account deletion.
+6. **Traceable Care Guidance**:
+   - Self-care guidance references accredited educational dermatology literature: **American Academy of Dermatology (AAD)**, **British Association of Dermatologists (BAD)**, and **DermNet NZ**.
 
 ---
 

@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { api, Provider, AssessmentSummary } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
 export default function ReferralPage() {
-  const { user, isAuthenticated } = useAuth();
-  const { t, language } = useLanguage();
+  const { isAuthenticated } = useAuth();
+  const { language } = useLanguage();
 
   const [providers, setProviders] = useState<Provider[]>([]);
   const [selectedDivision, setSelectedDivision] = useState<string>("all");
@@ -21,6 +20,7 @@ export default function ReferralPage() {
     if (isAuthenticated) {
       loadLatestAssessment();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDivision, isAuthenticated]);
 
   async function loadProviders() {
@@ -41,7 +41,7 @@ export default function ReferralPage() {
       if (history.length > 0) {
         setLatestAssessment(history[0]);
       }
-    } catch (e) {
+    } catch {
       // Non-critical
     }
   }

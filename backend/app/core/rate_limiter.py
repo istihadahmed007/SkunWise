@@ -1,6 +1,7 @@
 import time
 from typing import Dict, Tuple
 from fastapi import HTTPException, status, Request
+from app.core.config import settings
 
 class SimpleRateLimiter:
     """
@@ -64,11 +65,17 @@ class SimpleRateLimiter:
         FastAPI dependency helper.
         Extracts client IP and checks rate limit.
         """
-        client_ip = request.client.host if request.client else "127.0.0.1"
-        # Handle reverse proxies (e.g. X-Forwarded-For)
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            client_ip = forwarded.split(",")[0].strip()
+        connecting_ip = request.client.host if request.client else "127.0.0.1"
+        client_ip = connecting_ip
+
+        # Fail closed on proxy identity: Only inspect X-Forwarded-For if explicitly configured
+        # behind a reverse proxy AND the connecting hop is in the trusted proxy list
+        if getattr(settings, "BEHIND_TRUSTED_PROXY", False):
+            trusted_list = getattr(settings, "TRUSTED_PROXIES", ["127.0.0.1", "::1"])
+            if connecting_ip in trusted_list:
+                forwarded = request.headers.get("x-forwarded-for")
+                if forwarded:
+                    client_ip = forwarded.split(",")[0].strip()
 
         key = f"{client_ip}:{identifier_suffix}"
         allowed, retry_after = self.check(key)

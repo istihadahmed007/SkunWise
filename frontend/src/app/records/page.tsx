@@ -9,7 +9,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { TriageBadge } from "@/components/TriageBadge";
 
 export default function RecordsPage() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const { t, language } = useLanguage();
   const router = useRouter();
 

@@ -10,11 +10,52 @@ class DataRetentionService:
     Manages automated lifecycle retention and file scrubbing:
     - Enforces patient-configured data_retention_days (30, 90, 365, or indefinite).
     - Cleans up ephemeral/guest patient records older than 24 hours.
-    - Purges stored raw dermoscopic photographs from private storage.
+    - Purges stored raw photographs from private storage.
+    - Idempotent and logs non-PII operational metrics only.
     """
 
     @staticmethod
+    def cleanup_user_expired_records(db: Session, user: User) -> Dict[str, Any]:
+        """
+        Safely scrubs expired records for a single authenticated user only.
+        Guarantees isolation: cannot touch or observe any other user's records.
+        """
+        now = datetime.now(timezone.utc)
+        purged_images_count = 0
+        expired_assessments_count = 0
+
+        if user.data_retention_days > 0:
+            retention_cutoff = now - timedelta(days=user.data_retention_days)
+            expired_assessments = db.query(Assessment).filter(
+                Assessment.user_id == user.id,
+                Assessment.created_at < retention_cutoff,
+                Assessment.is_deleted == False
+            ).all()
+
+            for a in expired_assessments:
+                expired_assessments_count += 1
+                if a.image_filename and a.image_filename != "EPHEMERAL_PURGED":
+                    delete_private_image(a.image_filename)
+                    a.image_filename = "EPHEMERAL_PURGED"
+                    purged_images_count += 1
+                a.is_deleted = True
+
+            db.commit()
+
+        return {
+            "success": True,
+            "timestamp": now.isoformat(),
+            "user_id": user.id,
+            "purged_images_count": purged_images_count,
+            "expired_assessments_count": expired_assessments_count
+        }
+
+    @staticmethod
     def cleanup_expired_records(db: Session) -> Dict[str, Any]:
+        """
+        Internal worker/cron job: cleans up expired assessments across retention policies
+        and guest accounts older than 24h. Idempotent and logs non-PII counts.
+        """
         now = datetime.now(timezone.utc)
         purged_images_count = 0
         expired_assessments_count = 0

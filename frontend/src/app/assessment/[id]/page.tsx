@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api, Assessment, getApiBaseUrl } from "@/lib/api";
 import { TriageBadge } from "@/components/TriageBadge";
@@ -11,7 +11,6 @@ import { CosmeticSafetyCard } from "@/components/CosmeticSafetyCard";
 
 export default function AssessmentDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { t, language } = useLanguage();
   const id = params?.id as string;
 
@@ -107,7 +106,6 @@ export default function AssessmentDetailPage() {
   }
 
   const triage = assessment.triage;
-  const symptomData = assessment.symptom_data || {};
   const isUrgent = triage.triage_tier === 3 || triage.emergency_warning_detected;
   const resolvedPhoto = getResolvedImageUrl(assessment.image_url);
 

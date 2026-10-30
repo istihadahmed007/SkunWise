@@ -26,12 +26,12 @@ async def lifespan(app: FastAPI):
     if settings.ENVIRONMENT != "production" and settings.SEED_DEMO_DATA:
         db = SessionLocal()
         try:
-            user = db.query(User).filter(User.email == "sarah.patient@skinwise.local").first()
+            user = db.query(User).filter(User.email == "sarah.jenkins@example.com").first()
             if user:
                 return
             user = User(
-                email="sarah.patient@skinwise.local",
-                hashed_password=get_password_hash("ClinicalDemo2026!"),
+                email="sarah.jenkins@example.com",
+                hashed_password=get_password_hash("SkinWise2026!"),
                 full_name="Sarah Jenkins",
                 is_active=True,
                 zero_cloud_retention=False,

@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Query, UploadFile, File, HTTPException
+from fastapi import APIRouter, Query, UploadFile, File, HTTPException, Request, Depends, status
 from typing import Dict, Any, Optional
 from app.services.openfda_service import openfda_service
 from app.services.uv_service import uv_service
 from app.services.huggingface_adapter import huggingface_adapter
 from app.services.vision_engine import vision_engine
+from app.services.image_validation import sanitize_and_validate_image, read_stream_with_byte_limit
+from app.core.rate_limiter import analyze_rate_limiter
+from app.api.deps import get_current_user_optional
+from app.models.schemas import User
 from app.core.config import settings
 
 router = APIRouter(prefix="/integrations", tags=["Public APIs & Model Adapters"])
@@ -71,13 +75,27 @@ def get_models_status():
     }
 
 @router.post("/huggingface/analyze")
-async def analyze_with_huggingface(file: UploadFile = File(...)):
+async def analyze_with_huggingface(
+    request: Request,
+    file: UploadFile = File(...),
+    user: Optional[User] = Depends(get_current_user_optional)
+):
     """
     Run evaluated Hugging Face dermatology model inference (Jayanth2002/dinov2-base-finetuned-SkinDisease)
-    if HF_TOKEN is configured in backend environment variables.
+    with streaming size boundaries, rate limiting, and signature sanitization.
     """
-    image_bytes = await file.read()
-    if not image_bytes:
+    # 1. Enforce rate limiting against resource exhaustion
+    analyze_rate_limiter.enforce(request, identifier_suffix="hf_analyze")
+
+    # 2. Streamingly read with hard byte limit (prevents buffering unbounded payloads in RAM)
+    raw_bytes = await read_stream_with_byte_limit(file)
+    if not raw_bytes:
         raise HTTPException(status_code=400, detail="Empty image upload received.")
-    return huggingface_adapter.infer(image_bytes)
+
+    # 3. Sanitize and validate file signature, dimensions, and decompression limits
+    clean_bytes, _, _, _ = sanitize_and_validate_image(
+        raw_bytes, file.filename or "hf_upload.jpg", file.content_type
+    )
+
+    return huggingface_adapter.infer(clean_bytes)
 

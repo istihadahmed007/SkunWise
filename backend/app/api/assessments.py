@@ -17,7 +17,7 @@ from app.models.schemas import (
     TriageResultModel, AssessmentResponse, AssessmentSummaryItem
 )
 from app.api.deps import get_current_user, get_current_user_optional
-from app.services.image_validation import sanitize_and_validate_image
+from app.services.image_validation import sanitize_and_validate_image, read_stream_with_byte_limit
 from app.services.image_quality import evaluate_image_quality
 from app.services.vision_engine import vision_engine
 from app.services.triage_service import triage_service
@@ -94,8 +94,8 @@ async def analyze_skin(
         ))
         db.commit()
 
-    # 2. Read and sanitize image (validates magic bytes, pixel boundaries, EXIF stripping)
-    raw_bytes = await file.read()
+    # 2. Read and sanitize image (streaming byte limit, magic bytes, pixel boundaries, EXIF stripping)
+    raw_bytes = await read_stream_with_byte_limit(file)
     clean_bytes, image_hash, width, height = sanitize_and_validate_image(
         raw_bytes, file.filename or "skin_photo.jpg", file.content_type
     )
@@ -440,3 +440,65 @@ def get_private_image(
 
     filepath = get_private_image_path(filename)
     return FileResponse(filepath, media_type="image/jpeg")
+
+
+@router.get("/export/complete")
+def export_complete_patient_data(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Complete Patient Data Export (GDPR / HIPAA Data Portability):
+    Exports all stored data including full questionnaire responses, symptom history,
+    photometric quality metrics, visual observations, care guidance, and consent records.
+    """
+    assessments = db.query(Assessment).filter(
+        Assessment.user_id == user.id,
+        Assessment.is_deleted == False
+    ).order_by(Assessment.created_at.desc()).all()
+
+    consents = db.query(ConsentRecord).filter(ConsentRecord.user_id == user.id).all()
+
+    return {
+        "export_metadata": {
+            "format_version": "1.0",
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "patient_id": user.id,
+            "patient_email": user.email,
+            "patient_name": user.full_name,
+            "data_retention_days": user.data_retention_days,
+            "zero_cloud_retention": user.zero_cloud_retention,
+        },
+        "consent_history": [
+            {
+                "consent_type": c.consent_type,
+                "agreed": c.agreed,
+                "consented_at": c.consented_at.isoformat() if c.consented_at else None,
+                "revoked_at": c.revoked_at.isoformat() if c.revoked_at else None,
+                "terms_version": c.terms_version
+            }
+            for c in consents
+        ],
+        "assessments_count": len(assessments),
+        "assessments": [
+            {
+                "id": a.id,
+                "session_code": a.session_code,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+                "anatomical_region": a.anatomical_region,
+                "symptom_data": a.symptom_data,
+                "quality_metrics": a.quality_metrics,
+                "primary_condition": a.primary_condition,
+                "possible_conditions": a.possible_conditions,
+                "triage_tier": a.triage_tier,
+                "triage_title": a.triage_title,
+                "triage_rationale": a.triage_rationale,
+                "clinical_guidance": a.clinical_guidance,
+                "uncertainties": a.uncertainties,
+                "emergency_warning_detected": a.emergency_warning_detected,
+                "is_inconclusive": a.is_inconclusive,
+                "has_stored_image": bool(a.image_filename and a.image_filename != "EPHEMERAL_PURGED")
+            }
+            for a in assessments
+        ]
+    }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 
 export const Footer: React.FC = () => {
-  const { t, language } = useLanguage();
+  const { language } = useLanguage();
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const legalContent: Record<string, { title: string; body: string }> = {

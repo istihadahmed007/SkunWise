@@ -33,6 +33,7 @@ export default function SettingsPage() {
       setFullName(user.full_name || "");
       setZeroCloud(user.zero_cloud_retention ?? false);
       setRetentionDays(user.data_retention_days || 90);
+      setAiTelemetryOptIn(user.ai_telemetry_opt_in ?? false);
     }
   }, [user, isAuthenticated, authLoading, router]);
 
@@ -47,6 +48,7 @@ export default function SettingsPage() {
         full_name: fullName,
         zero_cloud_retention: zeroCloud,
         data_retention_days: Number(retentionDays),
+        ai_telemetry_opt_in: aiTelemetryOptIn,
       });
       await refreshUser();
       setSaveSuccess(true);

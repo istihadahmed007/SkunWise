@@ -46,11 +46,13 @@ def get_models_status():
     """
     Report the operational status, architecture, and spatial capabilities of integrated AI models.
     """
+    ai_status = vision_engine.get_ai_engine_status()
     return {
+        "engine_architecture": ai_status,
         "primary_vision_engine": {
-            "model_id": "gemini-3.5-flash-lite",
+            "model_id": ai_status["gemini"]["model_id"],
             "provider": "Google Multimodal API",
-            "status": "active" if vision_engine.is_configured() else "offline_fallback",
+            "status": "active" if ai_status["gemini"]["configured"] else "offline_fallback",
             "supports_localization": True,
             "bounding_box_format": "[ymin, xmin, ymax, xmax] normalized (0-1000)",
             "multimodal": True

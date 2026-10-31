@@ -31,6 +31,7 @@ export interface User {
   full_name: string;
   zero_cloud_retention: boolean;
   data_retention_days: number;
+  ai_telemetry_opt_in?: boolean;
   created_at: string;
 }
 
@@ -106,6 +107,7 @@ export interface TriageResult {
   emergency_warning_items: string[];
   is_inconclusive: boolean;
   inconclusive_reason?: string | null;
+  inference_status?: "successful" | "inconclusive" | "unavailable" | "failed" | string;
   possible_conditions: ConditionMatch[];
   safe_self_care: string[];
   what_to_avoid: string[];
@@ -337,6 +339,7 @@ export const api = {
     full_name?: string;
     zero_cloud_retention?: boolean;
     data_retention_days?: number;
+    ai_telemetry_opt_in?: boolean;
   }): Promise<User> {
     const base = getApiBaseUrl();
     const res = await fetch(`${base}/auth/settings`, {

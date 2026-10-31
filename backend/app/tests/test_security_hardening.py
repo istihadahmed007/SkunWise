@@ -426,3 +426,107 @@ def test_standardized_demo_account(client):
     assert login_res.status_code == 200
     assert "access_token" in login_res.json()
 
+
+def test_telemetry_settings_persistence(client):
+    """Verify patient can toggle AI telemetry opt-in and it persists in their profile."""
+    reg = client.post("/api/auth/register", json={
+        "email": "telemetry.user@example.com",
+        "password": "Password123!",
+        "full_name": "Telemetry Patient",
+        "consent_biometric": True,
+        "consent_disclaimer": True
+    })
+    assert reg.status_code == 200
+    token = reg.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Initial value should be False
+    me = client.get("/api/auth/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["ai_telemetry_opt_in"] is False
+
+    # Update to True
+    update_res = client.put("/api/auth/settings", headers=headers, json={
+        "ai_telemetry_opt_in": True
+    })
+    assert update_res.status_code == 200
+    assert update_res.json()["ai_telemetry_opt_in"] is True
+
+    # Re-fetch profile
+    me2 = client.get("/api/auth/me", headers=headers)
+    assert me2.json()["ai_telemetry_opt_in"] is True
+
+
+def test_models_status_monitoring_endpoint(client):
+    """Verify /api/integrations/models/status returns operational architecture."""
+    status_res = client.get("/api/integrations/models/status")
+    assert status_res.status_code == 200
+    data = status_res.json()
+    assert "engine_architecture" in data
+    assert "gemini" in data["engine_architecture"]
+    assert "huggingface" in data["engine_architecture"]
+    assert "active_mode" in data["engine_architecture"]
+
+
+def test_production_environment_fail_closed_checks():
+    """Verify that production deployments fail closed on weak/insecure keys or ephemeral SQLite."""
+    from app.core.config import Settings
+
+    # 1. Insecure default SECRET_KEY in production must raise RuntimeError
+    with pytest.raises(RuntimeError, match="CRITICAL SECURITY CONFIGURATION ERROR"):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="skinwise-dev-clinical-insecure-key-change-in-production",
+            WORKER_SECRET="a-very-long-and-secure-worker-secret-at-least-32-chars",
+            DATABASE_URL="postgresql://user:pass@host/db"
+        )
+
+    # 2. Insecure default WORKER_SECRET in production must raise RuntimeError
+    with pytest.raises(RuntimeError, match="CRITICAL SECURITY CONFIGURATION ERROR"):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="a-very-long-and-secure-jwt-secret-at-least-32-chars",
+            WORKER_SECRET="skinwise-local-worker-secret-internal-use-only",
+            DATABASE_URL="postgresql://user:pass@host/db"
+        )
+
+    # 3. WORKER_SECRET identical to SECRET_KEY in production must raise RuntimeError
+    identical_secret = "a-very-long-and-secure-identical-secret-32-chars"
+    with pytest.raises(RuntimeError, match="distinct from SECRET_KEY"):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY=identical_secret,
+            WORKER_SECRET=identical_secret,
+            DATABASE_URL="postgresql://user:pass@host/db"
+        )
+
+    # 4. Ephemeral SQLite /tmp database in production must raise RuntimeError
+    with pytest.raises(RuntimeError, match="CRITICAL DATA PERSISTENCE CONFIGURATION ERROR"):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="a-very-long-and-secure-jwt-secret-at-least-32-chars",
+            WORKER_SECRET="an-independent-long-worker-secret-32-chars-long",
+            DATABASE_URL="sqlite:////tmp/skinwise.db",
+            ALLOW_EPHEMERAL_DATABASE_IN_PRODUCTION=False
+        )
+
+
+@pytest.mark.anyio
+async def test_lifespan_startup_generator_yield():
+    """Verify lifespan context manager yields even when demo account already exists."""
+    from app.main import lifespan, app
+    from app.core.config import settings
+
+    # Simulate existing demo account scenario
+    original_seed = settings.SEED_DEMO_DATA
+    try:
+        settings.SEED_DEMO_DATA = True
+        # Run lifespan once
+        async with lifespan(app):
+            pass
+        # Run lifespan second time (user exists) - must NOT raise RuntimeError
+        async with lifespan(app):
+            pass
+    finally:
+        settings.SEED_DEMO_DATA = original_seed
+

@@ -164,6 +164,34 @@ CLINICAL_KNOWLEDGE_BASE = {
             "Severe facial swelling or fever accompanying skin breakout.",
             "Significant emotional distress or scarring from skin breakouts."
         ]
+    },
+    "general_skin_care": {
+        "title": "General Conservative Skin Barrier Care",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.aad.org/public/everyday-care/skin-care-basics",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "General supportive skincare: Focuses on preserving skin barrier hydration, gentle cleansing, and sun protection when photographic analysis is inconclusive or unavailable."
+        ),
+        "safe_self_care": [
+            "Gentle cleansing: Wash with plain lukewarm water and a mild, fragrance-free, soap-free cleanser. Pat dry gently.",
+            "Moisturize skin barrier: Apply a plain, fragrance-free moisturizing lotion or cream to soothe dryness and protect the barrier.",
+            "In-person evaluation: Have a qualified doctor or dermatologist examine any skin concern that persists, changes, or causes pain.",
+            "Patch testing: Test any new cosmetic product on a small spot on the inner arm for 24 hours before broader use; discontinue if stinging occurs.",
+            "Monitor for changes: Note any changes in size, color, border, or sensations over the coming days."
+        ],
+        "what_to_avoid": [
+            "Do NOT scratch, pick, or rub the affected skin, which worsens barrier irritation and risks infection.",
+            "Avoid hot water, harsh exfoliants, and fragranced lotions or alcohol-based astringents.",
+            "Do NOT apply unprescribed medicated creams without an in-person medical evaluation."
+        ],
+        "critical_warning_signs": [
+            "Rapidly spreading redness, swelling, or heat to the touch.",
+            "Pus, yellow crusting, or oozing (signs of infection).",
+            "Fever, chills, or generally feeling unwell.",
+            "Severe pain or any rapidly evolving, bleeding, or unusually dark spot."
+        ]
     }
 }
 
@@ -182,47 +210,57 @@ class RecommendationEngine:
     ) -> List[ConditionMatchModel]:
         """
         Integrates visual observation with user symptoms into non-diagnostic 'possible visible concerns'.
+        CRITICAL SAFETY RULE:
+        If visual inference was inconclusive, unavailable, or failed, DO NOT synthesize ranked image-based
+        possible_conditions from uniform or default probabilities. Return an empty list.
         """
-        probs = visual_findings.get("calibrated_probabilities", {})
-        morphology = visual_findings.get("morphological_features", {})
-        asym = morphology.get("asymmetry_score", 0.0)
-        border = morphology.get("border_irregularity", 0.0)
+        inference_status = visual_findings.get("inference_status", "inconclusive")
+        is_inconclusive = visual_findings.get("is_inconclusive", True)
+
+        # Do not produce ranked conditions if visual model did not successfully identify a pattern
+        if inference_status != "successful" or is_inconclusive:
+            return []
+
+        probs = visual_findings.get("observed_pattern_scores") or visual_findings.get("calibrated_probabilities", {})
+        if not probs:
+            return []
+
+        gemini_inf = visual_findings.get("gemini_inference")
+        matched_cat = gemini_inf.get("matched_category") if (gemini_inf and isinstance(gemini_inf, dict)) else None
 
         matches: List[ConditionMatchModel] = []
 
         # 1. Eczema / Contact Irritation
-        eczema_prob = probs.get("eczema_contact_dermatitis", 0.15)
+        eczema_prob = probs.get("eczema_contact_dermatitis", 0.05)
         if symptoms.prior_chemical_exposure:
-            eczema_prob += 0.25
+            eczema_prob += 0.20
         if symptoms.itch_score >= 6:
             eczema_prob += 0.15
 
         # 2. Dysplasia / Atypical Lesion
-        dysplasia_prob = probs.get("suspicious_dysplastic_lesion", 0.10)
+        dysplasia_prob = probs.get("suspicious_dysplastic_lesion", 0.05)
         if symptoms.bleeding_or_crusting:
             dysplasia_prob += 0.20
         if symptoms.is_spreading and symptoms.duration_days > 30:
             dysplasia_prob += 0.15
 
         # 3. Common Mole / Macule
-        benign_prob = probs.get("benign_melanocytic_macule", 0.15)
-        if asym < 0.15 and border < 0.20 and symptoms.itch_score == 0 and not symptoms.is_spreading:
-            benign_prob += 0.25
+        benign_prob = probs.get("benign_melanocytic_macule", 0.05)
 
         # 4. Scaly Plaque / Psoriasis pattern
-        psoriasis_prob = probs.get("psoriasis", 0.10)
+        psoriasis_prob = probs.get("psoriasis", 0.05)
         if "psoriasis" in (symptoms.personal_skin_history or "").lower():
-            psoriasis_prob += 0.30
+            psoriasis_prob += 0.25
 
         # 5. Ring-shaped / Fungal pattern
-        fungal_prob = probs.get("fungal_tinea", 0.10)
-        if border > 0.25 and symptoms.itch_score >= 4 and not symptoms.prior_chemical_exposure:
-            fungal_prob += 0.15
+        fungal_prob = probs.get("fungal_tinea", 0.05)
+        if symptoms.itch_score >= 4 and not symptoms.prior_chemical_exposure:
+            fungal_prob += 0.10
 
         # 6. Acne / Blemishes
-        acne_prob = probs.get("acne_vulgaris", 0.10)
+        acne_prob = probs.get("acne_vulgaris", 0.05)
         if "face" in symptoms.anatomical_region.lower() or "chest" in symptoms.anatomical_region.lower():
-            acne_prob += 0.20
+            acne_prob += 0.15
 
         weighted = [
             ("eczema_contact_dermatitis", eczema_prob),
@@ -234,7 +272,11 @@ class RecommendationEngine:
         ]
         weighted.sort(key=lambda x: x[1], reverse=True)
 
-        for rank, (cond_key, _) in enumerate(weighted[:3]):
+        for rank, (cond_key, score) in enumerate(weighted[:3]):
+            # Only include conditions with meaningful support or direct model match
+            if score < 0.20 and cond_key != matched_cat:
+                continue
+
             kb_data = CLINICAL_KNOWLEDGE_BASE.get(cond_key, {})
             cond_meta = SUPPORTED_CONDITIONS.get(cond_key, {})
 
@@ -385,28 +427,74 @@ class RecommendationEngine:
     ) -> TriageResultModel:
         """
         Assembles clean, conservative decision support in plain language.
+        Strictly distinguishes image analysis status (successful, inconclusive, unavailable, failed)
+        from symptom-based safety triage.
         """
+        inference_status = visual_findings.get("inference_status", "inconclusive")
+        is_inconclusive = (
+            (not is_quality_acceptable)
+            or visual_findings.get("is_inconclusive", True)
+            or (inference_status != "successful")
+        )
+
+        # Build safe, clear inconclusive reason and main finding
+        if not is_quality_acceptable:
+            inconclusive_reason = "The photo was unclear or lighting was insufficient. Please retake the photo in natural light or see a doctor."
+            main_finding = "Photo quality notice: Image was unclear or had suboptimal lighting for automated analysis."
+            status_for_model = "inconclusive"
+        elif inference_status == "unavailable":
+            inconclusive_reason = visual_findings.get("inference_status_reason", "Automated visual analysis is unconfigured or offline.")
+            main_finding = "Image analysis unavailable: Automated visual analysis is currently offline."
+            status_for_model = "unavailable"
+        elif inference_status == "failed":
+            inconclusive_reason = visual_findings.get("inference_status_reason", "Visual analysis service was temporarily unavailable.")
+            main_finding = f"Image analysis unavailable: {inconclusive_reason}"
+            status_for_model = "failed"
+        elif is_inconclusive:
+            inconclusive_reason = visual_findings.get("inference_status_reason", "Visual characteristics in the photograph could not be reliably categorized.")
+            main_finding = "Image analysis inconclusive: No definitive visual pattern could be determined from the photograph."
+            status_for_model = "inconclusive"
+        else:
+            inconclusive_reason = None
+            main_finding = None
+            status_for_model = "successful"
+
         diagnostic_gaps = [
             "Photos have limitations: A 2D photo cannot feel the skin texture, thickness, or temperature.",
             "Doctor visit needed for diagnosis: Only a qualified healthcare provider can perform an in-person examination and provide a medical diagnosis.",
             "Informational guidance only: This tool does not provide medical treatment, prescriptions, or laboratory tests."
         ]
+        if is_inconclusive:
+            diagnostic_gaps.insert(0, f"Analysis status: {inconclusive_reason}")
 
-        if not is_quality_acceptable:
-            diagnostic_gaps.insert(0, "Photo quality notice: The photo was slightly blurry or had uneven lighting, which limits how well visible features can be compared.")
+        # Synthesize possible conditions ONLY if visual inference was successful
+        if is_inconclusive:
+            possible_conditions: List[ConditionMatchModel] = []
+            primary_condition = "Inconclusive Visual Observation"
+            primary_kb = CLINICAL_KNOWLEDGE_BASE["general_skin_care"]
+            confidence_statement = (
+                f"{inconclusive_reason} Clinical evaluation by a qualified doctor is required for medical diagnosis."
+            )
+        else:
+            possible_conditions = cls.synthesize_multimodal_evidence(symptoms, visual_findings)
+            if possible_conditions:
+                primary_condition = possible_conditions[0].name
+                primary_match_key = possible_conditions[0].condition_id
+                primary_kb = CLINICAL_KNOWLEDGE_BASE.get(primary_match_key, CLINICAL_KNOWLEDGE_BASE["general_skin_care"])
+                main_finding = f"Possible visible concern: {primary_condition}"
+            else:
+                primary_condition = "Inconclusive Visual Observation"
+                primary_kb = CLINICAL_KNOWLEDGE_BASE["general_skin_care"]
+                main_finding = "Image analysis inconclusive: Pattern could not be matched with sufficient confidence."
+                is_inconclusive = True
+                inconclusive_reason = "Visual pattern match confidence was below threshold."
+                status_for_model = "inconclusive"
 
-        uncertainty = visual_findings.get("uncertainty_metrics", {})
-        is_inconclusive = (not is_quality_acceptable) or uncertainty.get("is_out_of_distribution", False)
-        inconclusive_reason = None
-        if not is_quality_acceptable:
-            inconclusive_reason = "The photo was unclear or lighting was insufficient. Please retake the photo in natural light or see a doctor."
-        elif uncertainty.get("is_out_of_distribution", False):
-            inconclusive_reason = "The visible features did not clearly match known reference patterns. An in-person doctor check is recommended."
-
-        possible_conditions = cls.synthesize_multimodal_evidence(symptoms, visual_findings)
-        primary_match_key = possible_conditions[0].condition_id if possible_conditions else "eczema_contact_dermatitis"
-
-        primary_kb = CLINICAL_KNOWLEDGE_BASE.get(primary_match_key, CLINICAL_KNOWLEDGE_BASE["eczema_contact_dermatitis"])
+            uncertainty = visual_findings.get("uncertainty_metrics", {})
+            confidence_statement = uncertainty.get(
+                "uncertainty_rationale",
+                "Automated visual pattern match. Medical evaluation required for clinical diagnosis."
+            )
 
         # 1. Cosmetic Skin Type (Cleanly separated from disease analysis)
         cosmetic_skin_type = cls.evaluate_cosmetic_skin_type(symptoms, visual_findings)
@@ -425,9 +513,10 @@ class RecommendationEngine:
         )
 
         # 3. Recommended Skincare Options (Max 3)
-        recommended_skincare = cls.generate_skincare_options(cosmetic_skin_type, primary_match_key)
+        condition_for_skincare = possible_conditions[0].condition_id if possible_conditions else "general"
+        recommended_skincare = cls.generate_skincare_options(cosmetic_skin_type, condition_for_skincare)
 
-        # 4. Care Level
+        # 4. Care Level (Strictly follows triage safety rules!)
         if triage_pathway["triage_tier"] == 3:
             care_level = "Seek urgent medical care"
         elif triage_pathway["triage_tier"] == 2:
@@ -456,36 +545,47 @@ class RecommendationEngine:
             ]
 
         citations = []
-        for cond in possible_conditions:
-            kb = CLINICAL_KNOWLEDGE_BASE.get(cond.condition_id)
-            if kb:
-                citations.append({
-                    "title": kb["title"],
-                    "publisher": kb["publisher"],
-                    "url": kb["reference_url"],
-                    "last_reviewed": kb["last_reviewed"],
-                    "status": kb["approval_status"]
-                })
+        if possible_conditions:
+            for cond in possible_conditions:
+                kb = CLINICAL_KNOWLEDGE_BASE.get(cond.condition_id)
+                if kb:
+                    citations.append({
+                        "title": kb["title"],
+                        "publisher": kb["publisher"],
+                        "url": kb["reference_url"],
+                        "last_reviewed": kb["last_reviewed"],
+                        "status": kb["approval_status"]
+                    })
+        else:
+            gen_kb = CLINICAL_KNOWLEDGE_BASE["general_skin_care"]
+            citations.append({
+                "title": gen_kb["title"],
+                "publisher": gen_kb["publisher"],
+                "url": gen_kb["reference_url"],
+                "last_reviewed": gen_kb["last_reviewed"],
+                "status": gen_kb["approval_status"]
+            })
 
         return TriageResultModel(
             triage_tier=triage_pathway["triage_tier"],
             triage_name=triage_pathway["triage_name"],
             recommended_timeline=triage_pathway["recommended_timeline"],
             urgency_badge_color=triage_pathway["urgency_badge_color"],
-            primary_condition=possible_conditions[0].name if possible_conditions else "Visible Skin Concern",
+            primary_condition=primary_condition,
             rationale=triage_pathway["rationale"],
             emergency_warning_detected=triage_pathway.get("emergency_warning_detected", False),
             emergency_warning_items=triage_pathway.get("emergency_warning_items", []),
             is_inconclusive=is_inconclusive,
             inconclusive_reason=inconclusive_reason,
+            inference_status=status_for_model,
             possible_conditions=possible_conditions,
             safe_self_care=primary_kb.get("safe_self_care", []),
             what_to_avoid=primary_kb.get("what_to_avoid", []),
             critical_warning_signs=primary_kb.get("critical_warning_signs", []),
             diagnostic_gaps=diagnostic_gaps,
             citations=citations,
-            main_finding=f"Possible visible concern: {possible_conditions[0].name}" if possible_conditions else "Visible skin observation",
-            confidence_statement=uncertainty.get("uncertainty_rationale", "Automated visual pattern match. Medical evaluation required for clinical diagnosis."),
+            main_finding=main_finding,
+            confidence_statement=confidence_statement,
             cosmetic_skin_type=cosmetic_skin_type,
             detected_area=detected_area,
             recommended_skincare=recommended_skincare,

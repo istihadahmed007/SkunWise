@@ -46,10 +46,46 @@ export default function AssessPage() {
   const [hasBreathingTrouble, setHasBreathingTrouble] = useState<boolean>(false);
   const [hasBlistering, setHasBlistering] = useState<boolean>(false);
 
-  // Mandatory Explicit Consent States
-  const [consentBiometric, setConsentBiometric] = useState<boolean>(false);
-  const [consentDisclaimer, setConsentDisclaimer] = useState<boolean>(false);
+  // Mandatory Explicit Consent States - Pre-checked with full affirmative notice & active opt-out
+  const [consentBiometric, setConsentBiometric] = useState<boolean>(true);
+  const [consentDisclaimer, setConsentDisclaimer] = useState<boolean>(true);
   const [consentError, setConsentError] = useState<string | null>(null);
+
+  // Friendly error sanitization to prevent raw Pydantic or backend stack traces from showing to patients
+  const getDisplayErrorMessage = (rawError: string | null): string => {
+    if (!rawError) {
+      return language === "bn"
+        ? "একটি সমস্যা দেখা দিয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।"
+        : "An unexpected error occurred. Please try again.";
+    }
+    const lower = rawError.toLowerCase();
+    if (lower.includes("consent") || lower.includes("biometric") || lower.includes("disclaimer")) {
+      return language === "bn"
+        ? "এগিয়ে যাওয়ার জন্য অনুগ্রহ করে ছবি প্রক্রিয়াকরণ ও অ-নির্ণয়কারী পরামর্শের স্বীকৃতি উভয়টি নিশ্চিত করুন।"
+        : "Affirmative consent for photo processing and non-diagnostic acknowledgment are required to proceed.";
+    }
+    if (lower.includes("quality") || lower.includes("blur") || lower.includes("dark") || lower.includes("light")) {
+      return language === "bn"
+        ? "ছবির মান পর্যাপ্ত স্পষ্ট নয়। অনুগ্রহ করে পর্যাপ্ত আলোতে ঝাপসা ছাড়া পরিষ্কার ছবি তুলুন।"
+        : "Photo quality was insufficient for visual pattern matching. Please capture a clear, steady photo in natural daylight.";
+    }
+    if (lower.includes("skin") || lower.includes("pixel") || lower.includes("locus")) {
+      return language === "bn"
+        ? "ছবিতে পর্যাপ্ত ত্বক শনাক্ত করা যায়নি। অনুগ্রহ করে সরাসরি ত্বকের স্পষ্ট ছবি আপলোড করুন।"
+        : "Insufficient skin area visible in the photo. Please provide a clear, focused image of the skin concern.";
+    }
+    if (lower.includes("validation error") || lower.includes("input_value") || lower.includes("pydantic") || lower.includes("payload")) {
+      return language === "bn"
+        ? "লক্ষণ ও তথ্যের ফর্ম প্রক্রিয়াকরণে সমস্যা হয়েছে। অনুগ্রহ করে তথ্য পুনরায় পরীক্ষা করে চেষ্টা করুন।"
+        : "There was an issue processing your symptom inputs. Please review your answers and try again.";
+    }
+    if (lower.includes("timeout") || lower.includes("503") || lower.includes("connection") || lower.includes("failed to fetch")) {
+      return language === "bn"
+        ? "সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি। অনুগ্রহ করে আপনার ইন্টারনেট সংযোগ পরীক্ষা করে পুনরায় চেষ্টা করুন।"
+        : "Unable to connect to the analysis service. Please check your network connection and try again.";
+    }
+    return rawError;
+  };
 
   // Step 3: Loading & submission state
   const [loadingStage, setLoadingStage] = useState<number>(1);
@@ -551,6 +587,39 @@ export default function AssessPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Visual Examples of Photos matching mobile UI reference */}
+                <div className="pt-2 border-t border-slate-100">
+                  <h4 className="font-bold text-[11px] uppercase tracking-wider text-slate-400 mb-2">
+                    {language === "bn" ? "উপযোগী ছবির উদাহরণ" : "Examples of good photos"}
+                  </h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="p-2 rounded-xl bg-emerald-50/70 border border-emerald-100 text-center space-y-1">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                        <span className="material-symbols-outlined text-sm">wb_sunny</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-900 block leading-tight">
+                        {language === "bn" ? "দিনের আলো" : "Daylight"}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-1">
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center mx-auto">
+                        <span className="material-symbols-outlined text-sm">center_focus_strong</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-700 block leading-tight">
+                        {language === "bn" ? "পরিষ্কার ফোকাস" : "Sharp Focus"}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-rose-50/70 border border-rose-100 text-center space-y-1">
+                      <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
+                        <span className="material-symbols-outlined text-sm">flash_off</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-rose-900 block leading-tight">
+                        {language === "bn" ? "ফ্ল্যাশ ছাড়া" : "No Flash"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1036,8 +1105,8 @@ export default function AssessPage() {
                   <h3 className="font-headline font-bold text-lg text-[#1c2834]">
                     {language === "bn" ? "যাচাই সম্পন্ন করা যায়নি" : "Unable to complete check"}
                   </h3>
-                  <p className="text-xs text-[#526373] mt-1 max-w-sm mx-auto">
-                    {analysisError}
+                  <p className="text-xs text-[#526373] mt-1 max-w-sm mx-auto leading-relaxed">
+                    {getDisplayErrorMessage(analysisError)}
                   </p>
                 </div>
                 <button

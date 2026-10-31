@@ -1,11 +1,25 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { api, AssessmentSummary } from "@/lib/api";
 import { EmergencyModal } from "@/components/EmergencyModal";
+
+interface RoutineTask {
+  id: number;
+  titleEn: string;
+  titleBn: string;
+  done: boolean;
+  time: string;
+}
+
+const DEFAULT_ROUTINE_TASKS: RoutineTask[] = [
+  { id: 1, titleEn: "Monthly ABCDE Mole Self-Exam", titleBn: "মাসিক আঁচিল ও তিলের স্ব-নিরীক্ষণ", done: false, time: "Every 30 days" },
+  { id: 2, titleEn: "Daily Broad-Spectrum SPF 30+ Routine", titleBn: "দৈনিক সানস্ক্রিন ও ত্বক সুরক্ষা", done: false, time: "Every morning" },
+  { id: 3, titleEn: "Skin Barrier & Moisture Check", titleBn: "ত্বকের আর্দ্রতা ও সুরক্ষা পরীক্ষা", done: false, time: "Weekly" },
+];
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -13,19 +27,42 @@ export default function DashboardPage() {
   const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showEmergency, setShowEmergency] = useState(false);
+
+  // Calendar state with working month navigation
+  const [calendarDate, setCalendarDate] = useState<Date>(new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<number>(new Date().getDate());
 
-  // Interactive routine checklist state
-  const [routineTasks, setRoutineTasks] = useState([
-    { id: 1, titleEn: "Monthly ABCDE Mole Self-Exam", titleBn: "মাসিক আঁচিল ও তিলের স্ব-নিরীক্ষণ", done: false, time: "Every 30 days" },
-    { id: 2, titleEn: "Daily Broad-Spectrum SPF 30+ Routine", titleBn: "দৈনিক সানস্ক্রিন ও ত্বক সুরক্ষা", done: true, time: "Every morning" },
-    { id: 3, titleEn: "Skin Barrier & Moisture Check", titleBn: "ত্বকের আর্দ্রতা ও সুরক্ষা পরীক্ষা", done: false, time: "Weekly" },
-  ]);
+  // Interactive routine checklist state with localStorage persistence
+  const [routineTasks, setRoutineTasks] = useState<RoutineTask[]>(DEFAULT_ROUTINE_TASKS);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("skinwise_routine_tasks");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setRoutineTasks(parsed);
+          }
+        }
+      } catch {
+        // Fallback to default
+      }
+    }
+  }, []);
 
   const toggleTask = (id: number) => {
-    setRoutineTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    );
+    setRoutineTasks((prev) => {
+      const updated = prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("skinwise_routine_tasks", JSON.stringify(updated));
+        } catch {
+          // ignore storage quota errors
+        }
+      }
+      return updated;
+    });
   };
 
   useEffect(() => {
@@ -40,14 +77,136 @@ export default function DashboardPage() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const userName = user?.full_name ? user.full_name.split(" ")[0] : "Sakif";
-  const now = new Date();
-  const currentMonthName = now.toLocaleString("default", { month: "long" });
-  const currentYear = now.getFullYear();
+  // Safe dynamic username
+  const userName = useMemo(() => {
+    if (user?.full_name?.trim()) {
+      return user.full_name.trim().split(" ")[0];
+    }
+    if (user?.email) {
+      return user.email.split("@")[0];
+    }
+    return language === "bn" ? "ব্যবহারকারী" : "Patient";
+  }, [user, language]);
 
-  // Days in current month for the mini-calendar
-  const daysInMonth = new Date(currentYear, now.getMonth() + 1, 0).getDate();
+  // Calendar calculations
+  const calendarYear = calendarDate.getFullYear();
+  const calendarMonth = calendarDate.getMonth();
+  const currentMonthName = calendarDate.toLocaleString("default", { month: "long" });
+  const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
   const calendarDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const handlePrevMonth = () => {
+    setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const handleResetToday = () => {
+    const today = new Date();
+    setCalendarDate(today);
+    setSelectedCalendarDate(today.getDate());
+  };
+
+  // Dynamic calculations from real patient assessments
+  const totalObservations = assessments.length;
+
+  // 1. Dynamic Body Zone Distribution from real assessment history
+  const zoneBreakdown = useMemo(() => {
+    if (totalObservations === 0) return [];
+
+    const zoneCounts: { [key: string]: number } = {
+      "Arms & Hands": 0,
+      "Face & Neck": 0,
+      "Torso & Back": 0,
+      "Legs & Feet": 0,
+    };
+
+    assessments.forEach((a) => {
+      const loc = (a.anatomical_region || "").toLowerCase();
+      if (
+        loc.includes("arm") ||
+        loc.includes("hand") ||
+        loc.includes("wrist") ||
+        loc.includes("forearm") ||
+        loc.includes("shoulder") ||
+        loc.includes("deltoid")
+      ) {
+        zoneCounts["Arms & Hands"] += 1;
+      } else if (
+        loc.includes("face") ||
+        loc.includes("neck") ||
+        loc.includes("head") ||
+        loc.includes("cheek") ||
+        loc.includes("forehead") ||
+        loc.includes("scalp")
+      ) {
+        zoneCounts["Face & Neck"] += 1;
+      } else if (
+        loc.includes("torso") ||
+        loc.includes("chest") ||
+        loc.includes("back") ||
+        loc.includes("belly") ||
+        loc.includes("abdomen")
+      ) {
+        zoneCounts["Torso & Back"] += 1;
+      } else if (
+        loc.includes("leg") ||
+        loc.includes("thigh") ||
+        loc.includes("calf") ||
+        loc.includes("foot") ||
+        loc.includes("feet")
+      ) {
+        zoneCounts["Legs & Feet"] += 1;
+      } else {
+        zoneCounts["Arms & Hands"] += 1;
+      }
+    });
+
+    return [
+      { label: "Arms & Hands", count: zoneCounts["Arms & Hands"], percent: Math.round((zoneCounts["Arms & Hands"] / totalObservations) * 100), color: "bg-[#2b7f8f]" },
+      { label: "Face & Neck", count: zoneCounts["Face & Neck"], percent: Math.round((zoneCounts["Face & Neck"] / totalObservations) * 100), color: "bg-[#4da8b9]" },
+      { label: "Torso & Back", count: zoneCounts["Torso & Back"], percent: Math.round((zoneCounts["Torso & Back"] / totalObservations) * 100), color: "bg-[#8ec7d3]" },
+      { label: "Legs & Feet", count: zoneCounts["Legs & Feet"], percent: Math.round((zoneCounts["Legs & Feet"] / totalObservations) * 100), color: "bg-slate-300" },
+    ];
+  }, [assessments, totalObservations]);
+
+  // 2. Dynamic Care Pathway Distribution from real triage tiers
+  const carePathways = useMemo(() => {
+    if (totalObservations === 0) return { general: 0, doctor: 0, urgent: 0 };
+    const tier1 = assessments.filter((a) => (a.triage_tier || 1) === 1).length;
+    const tier2 = assessments.filter((a) => (a.triage_tier || 1) === 2).length;
+    const tier3 = assessments.filter((a) => (a.triage_tier || 1) >= 3).length;
+
+    return {
+      general: Math.round((tier1 / totalObservations) * 100),
+      doctor: Math.round((tier2 / totalObservations) * 100),
+      urgent: Math.round((tier3 / totalObservations) * 100),
+    };
+  }, [assessments, totalObservations]);
+
+  // 3. Dynamic Skin Barrier status from real patient observations
+  const barrierStatus = useMemo(() => {
+    if (totalObservations === 0) {
+      return { status: "Pending First Check", note: "No records yet" };
+    }
+    const latest = assessments[0];
+    const condition = (latest.primary_condition || "").toLowerCase();
+    if (condition.includes("contact") || condition.includes("eczema") || condition.includes("dermatitis")) {
+      return { status: "Sensitive / Reactive", note: "Irritant pattern noted" };
+    }
+    if (condition.includes("acne")) {
+      return { status: "Active Blemish Focus", note: "Follicular care indicated" };
+    }
+    if (condition.includes("psoriasis")) {
+      return { status: "Plaque / Scaly Zone", note: "Moisture barrier care" };
+    }
+    return { status: "Observed / Balanced", note: "Based on recent check" };
+  }, [assessments, totalObservations]);
+
+  // 4. Routine completion count
+  const completedTasks = routineTasks.filter((t) => t.done).length;
 
   return (
     <div className="min-h-screen bg-[#edf6f9] text-slate-800 pb-20">
@@ -140,11 +299,11 @@ export default function DashboardPage() {
                   <span className="material-symbols-outlined text-3xl">medical_services</span>
                 </div>
                 <span className="text-[11px] font-bold text-white tracking-wide">SkinWise AI</span>
-                <span className="text-[9px] text-white/80">Clinical Guidelines</span>
+                <span className="text-[9px] text-white/80">Supportive Triage</span>
               </div>
             </div>
 
-            {/* Pinned Information / Health Vitals Row matching screenshot */}
+            {/* Pinned Information / Health Vitals Row - Dynamic Grounding */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -157,14 +316,15 @@ export default function DashboardPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Metric 1: Skin Profile */}
+                {/* Metric 1: Skin Profile from actual observations */}
                 <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-xl">water_drop</span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-400 font-medium">Skin Barrier</span>
-                    <h4 className="text-sm font-bold text-slate-900">Normal / Balanced</h4>
+                    <h4 className="text-sm font-bold text-slate-900">{barrierStatus.status}</h4>
+                    <span className="text-[10px] text-slate-400 block">{barrierStatus.note}</span>
                   </div>
                 </div>
 
@@ -175,7 +335,12 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-400 font-medium">Self-Check Routine</span>
-                    <h4 className="text-sm font-bold text-slate-900">Up to date</h4>
+                    <h4 className="text-sm font-bold text-slate-900">
+                      {completedTasks === routineTasks.length
+                        ? "Up to date"
+                        : `${completedTasks} of ${routineTasks.length} Done`}
+                    </h4>
+                    <span className="text-[10px] text-slate-400 block">Personal checklist</span>
                   </div>
                 </div>
 
@@ -187,12 +352,13 @@ export default function DashboardPage() {
                   <div>
                     <span className="text-[11px] text-slate-400 font-medium">UV Protection</span>
                     <h4 className="text-sm font-bold text-slate-900">SPF 30+ Daily</h4>
+                    <span className="text-[10px] text-slate-400 block">Dermatology baseline</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Visual Observations Summary Card */}
+            {/* Visual Observations Summary Card - Computed from Real Assessments */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Card 1: Anatomical Zone Breakdown */}
               <div className="bg-white p-5 rounded-2xl border border-[#d1e5ec] shadow-xs space-y-3">
@@ -200,26 +366,33 @@ export default function DashboardPage() {
                   <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
                     {language === "bn" ? "পর্যবেক্ষিত স্থানসমূহ" : "Observations by Body Zone"}
                   </h4>
-                  <span className="text-[10px] text-slate-400 font-semibold">Total: {assessments.length}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold">Total: {totalObservations}</span>
                 </div>
-                <div className="space-y-2 pt-1">
-                  {[
-                    { label: "Arms & Hands", percent: 45, color: "bg-[#2b7f8f]" },
-                    { label: "Face & Neck", percent: 30, color: "bg-[#4da8b9]" },
-                    { label: "Torso & Back", percent: 15, color: "bg-[#8ec7d3]" },
-                    { label: "Legs & Feet", percent: 10, color: "bg-slate-300" },
-                  ].map((zone) => (
-                    <div key={zone.label} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs text-slate-600">
-                        <span>{zone.label}</span>
-                        <span className="font-bold">{zone.percent}%</span>
+
+                {totalObservations === 0 ? (
+                  <div className="py-8 text-center text-slate-400 text-xs space-y-2">
+                    <span className="material-symbols-outlined text-2xl text-slate-300 block">accessibility_new</span>
+                    <p className="max-w-xs mx-auto">
+                      {language === "bn"
+                        ? "এখনও কোনো পর্যবেক্ষণ রেকর্ড নেই। প্রথম পরীক্ষার পর শরীরের স্থানভিত্তিক চিত্র এখানে প্রদর্শিত হবে।"
+                        : "No assessments recorded yet. Your anatomical zone breakdown will appear here after your first check."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 pt-1">
+                    {zoneBreakdown.map((zone) => (
+                      <div key={zone.label} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs text-slate-600">
+                          <span>{zone.label}</span>
+                          <span className="font-bold">{zone.percent}%</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                          <div className={`h-full ${zone.color}`} style={{ width: `${zone.percent}%` }} />
+                        </div>
                       </div>
-                      <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-                        <div className={`h-full ${zone.color}`} style={{ width: `${zone.percent}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Card 2: Care Action Pathways */}
@@ -229,32 +402,46 @@ export default function DashboardPage() {
                     {language === "bn" ? "প্রস্তাবিত পদক্ষেপসমূহ" : "Care Pathways"}
                   </h4>
                   <p className="text-xs text-slate-500 mt-1">
-                    Guidance recommended based on your reported symptoms and visible patterns.
+                    {language === "bn"
+                      ? "আপনার বাস্তব নিরীক্ষণের ভিত্তিতে প্রস্তাবিত স্বাস্থ্য ও যত্ন নির্দেশিকা।"
+                      : "Distribution of triage guidance across your recorded skin concerns."}
                   </p>
-                  <div className="mt-4 flex items-center justify-center gap-6">
-                    <div className="text-center">
-                      <div className="w-12 h-12 rounded-full bg-[#eaf4f8] text-[#2b7f8f] flex items-center justify-center mx-auto font-bold text-base">
-                        80%
-                      </div>
-                      <span className="text-[10px] text-slate-500 font-semibold mt-1 block">General Care</span>
+
+                  {totalObservations === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs space-y-2">
+                      <span className="material-symbols-outlined text-2xl text-slate-300 block">health_and_safety</span>
+                      <p className="max-w-xs mx-auto">
+                        {language === "bn"
+                          ? "কোনো ট্রায়াজ হিস্ট্রি নেই। ফলাফল বিশ্লেষণের পর কেয়ার পাথওয়ে প্রদর্শিত হবে।"
+                          : "No triage history recorded yet. Triage breakdown will compute from your real checks."}
+                      </p>
                     </div>
-                    <div className="text-center">
-                      <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto font-bold text-base">
-                        15%
+                  ) : (
+                    <div className="mt-4 flex items-center justify-center gap-6">
+                      <div className="text-center">
+                        <div className="w-12 h-12 rounded-full bg-[#eaf4f8] text-[#2b7f8f] flex items-center justify-center mx-auto font-bold text-base">
+                          {carePathways.general}%
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-semibold mt-1 block">General Care</span>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-semibold mt-1 block">Doctor Review</span>
-                    </div>
-                    <div className="text-center">
-                      <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto font-bold text-base">
-                        5%
+                      <div className="text-center">
+                        <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto font-bold text-base">
+                          {carePathways.doctor}%
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-semibold mt-1 block">Doctor Review</span>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-semibold mt-1 block">Urgent Care</span>
+                      <div className="text-center">
+                        <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto font-bold text-base">
+                          {carePathways.urgent}%
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-semibold mt-1 block">Urgent Care</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
                 <Link
                   href="/referral"
-                  className="w-full py-2 px-3 rounded-xl bg-[#f0f8fb] hover:bg-[#e4f2f7] text-[#2b7f8f] text-xs font-bold text-center block transition-colors"
+                  className="w-full py-2 px-3 rounded-xl bg-[#f0f8fb] hover:bg-[#e4f2f7] text-[#2b7f8f] text-xs font-bold text-center block transition-colors mt-4"
                 >
                   {language === "bn" ? "হাসপাতাল ও ক্লিনিক তালিকা দেখুন →" : "Find Dermatology Specialists →"}
                 </Link>
@@ -344,7 +531,7 @@ export default function DashboardPage() {
           {/* Right Column (4 cols): Mini Calendar, Line up Check-ups, Previous Check-ups */}
           <div className="lg:col-span-4 space-y-6">
 
-            {/* Mini Calendar Card matching reference screenshot */}
+            {/* Mini Calendar Card with Working Navigation & Real Patient Dates */}
             <div className="bg-white p-5 rounded-3xl border border-[#d1e5ec] shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-sm text-slate-900">
@@ -352,20 +539,34 @@ export default function DashboardPage() {
                 </h3>
                 <button
                   type="button"
-                  onClick={() => setSelectedCalendarDate(now.getDate())}
-                  className="w-7 h-7 rounded-full bg-[#f0f8fb] text-[#2b7f8f] flex items-center justify-center hover:bg-[#e4f2f7] transition-colors"
+                  onClick={handleResetToday}
+                  className="w-7 h-7 rounded-full bg-[#f0f8fb] text-[#2b7f8f] flex items-center justify-center hover:bg-[#e4f2f7] transition-colors cursor-pointer"
                   title="Today"
                 >
                   <span className="material-symbols-outlined text-sm">today</span>
                 </button>
               </div>
 
-              {/* Month Header */}
+              {/* Month Header with Functional Navigation Controls */}
               <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
-                <span>{currentMonthName} {currentYear}</span>
-                <div className="flex items-center gap-1 text-slate-400">
-                  <span className="material-symbols-outlined text-base cursor-pointer hover:text-slate-700">chevron_left</span>
-                  <span className="material-symbols-outlined text-base cursor-pointer hover:text-slate-700">chevron_right</span>
+                <span>{currentMonthName} {calendarYear}</span>
+                <div className="flex items-center gap-1 text-slate-500">
+                  <button
+                    type="button"
+                    onClick={handlePrevMonth}
+                    aria-label="Previous month"
+                    className="p-1 rounded-lg hover:bg-slate-100 transition-colors flex items-center justify-center cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-base">chevron_left</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextMonth}
+                    aria-label="Next month"
+                    className="p-1 rounded-lg hover:bg-slate-100 transition-colors flex items-center justify-center cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-base">chevron_right</span>
+                  </button>
                 </div>
               </div>
 
@@ -380,12 +581,26 @@ export default function DashboardPage() {
                 <span>S</span>
               </div>
 
-              {/* Calendar Grid */}
+              {/* Calendar Grid with Real Assessment Date Indicators */}
               <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                {calendarDays.slice(0, 28).map((day) => {
-                  const isToday = day === now.getDate();
+                {calendarDays.map((day) => {
+                  const today = new Date();
+                  const isToday =
+                    day === today.getDate() &&
+                    calendarMonth === today.getMonth() &&
+                    calendarYear === today.getFullYear();
+
                   const isSelected = day === selectedCalendarDate;
-                  const hasCheckupDot = day === 14 || day === 28;
+
+                  // Genuine check: did patient take an assessment on this day?
+                  const hasAssessmentOnDay = assessments.some((a) => {
+                    const d = new Date(a.created_at);
+                    return (
+                      d.getDate() === day &&
+                      d.getMonth() === calendarMonth &&
+                      d.getFullYear() === calendarYear
+                    );
+                  });
 
                   return (
                     <button
@@ -401,8 +616,8 @@ export default function DashboardPage() {
                       }`}
                     >
                       <span>{day}</span>
-                      {hasCheckupDot && !isSelected && (
-                        <span className="w-1 h-1 rounded-full bg-[#2b7f8f] absolute bottom-1" />
+                      {hasAssessmentOnDay && !isSelected && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#f43f5e] absolute bottom-1" title="Assessment logged" />
                       )}
                     </button>
                   );
@@ -410,7 +625,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Line up Check-ups / Recommended Routine Checklist matching screenshot */}
+            {/* Line up Check-ups / Recommended Routine Checklist with Persistence */}
             <div className="bg-white p-5 rounded-3xl border border-[#d1e5ec] shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-sm text-slate-900">

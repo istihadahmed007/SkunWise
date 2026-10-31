@@ -21,6 +21,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     zero_cloud_retention = Column(Boolean, default=False)
     data_retention_days = Column(Integer, default=90)
+    ai_telemetry_opt_in = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -137,12 +138,14 @@ class UserProfileResponse(BaseModel):
     full_name: str
     zero_cloud_retention: bool
     data_retention_days: int
+    ai_telemetry_opt_in: bool = False
     created_at: datetime
 
 class UserSettingsUpdateRequest(BaseModel):
     full_name: Optional[str] = None
     zero_cloud_retention: Optional[bool] = None
     data_retention_days: Optional[int] = None
+    ai_telemetry_opt_in: Optional[bool] = None
 
 class SymptomQuestionnaireInput(BaseModel):
     anatomical_region: str = Field("Volar Forearm", description="Body location")
@@ -227,6 +230,7 @@ class TriageResultModel(BaseModel):
     emergency_warning_items: List[str]
     is_inconclusive: bool
     inconclusive_reason: Optional[str] = None
+    inference_status: Optional[str] = None  # "successful", "inconclusive", "unavailable", "failed"
     possible_conditions: List[ConditionMatchModel]
     safe_self_care: List[str]
     what_to_avoid: List[str]

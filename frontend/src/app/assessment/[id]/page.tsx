@@ -23,6 +23,9 @@ export default function AssessmentDetailPage() {
 
   useEffect(() => {
     if (!id) return;
+    setIsLoading(true);
+    setAssessment(null);
+    setError(null);
     api
       .getAssessment(id)
       .then((data) => {
@@ -276,14 +279,44 @@ export default function AssessmentDetailPage() {
 
           {/* Finding Description & Honest Uncertainty Indicator */}
           <div className="md:col-span-7 space-y-4">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-[#2b7f8f] block">
-                {language === "bn" ? "সম্ভাব্য দৃশ্যমান লক্ষণ" : "Possible visible concern"}
-              </span>
-              <h3 className="font-headline font-extrabold text-2xl text-[#192531] mt-0.5">
-                {triage.main_finding || triage.primary_condition}
-              </h3>
-            </div>
+            {triage.is_inconclusive ? (
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                  <span className="material-symbols-outlined text-sm">visibility_off</span>
+                  <span>
+                    {language === "bn"
+                      ? "ভিজ্যুয়াল বিশ্লেষণ অনির্ণীত / অপ্রাপ্য"
+                      : "Visual Analysis Inconclusive"}
+                  </span>
+                </div>
+                <h3 className="font-headline font-extrabold text-2xl text-[#192531]">
+                  {language === "bn"
+                    ? "অনির্ণীত পর্যবেক্ষণ ও উপসর্গভিত্তিক নির্দেশনা"
+                    : "Inconclusive Visual Observation"}
+                </h3>
+                <p className="text-sm text-[#4a5d6e] leading-relaxed">
+                  {triage.inconclusive_reason ||
+                    (language === "bn"
+                      ? "ছবির দৃশ্যমান বৈশিষ্ট্য কোনো সুনির্দিষ্ট চর্মরোগ প্যাটার্নের সাথে নির্ভরযোগ্যভাবে মেলেনি।"
+                      : "The visible characteristics in the photograph could not be conclusively matched to a known condition pattern.")}
+                </p>
+                <div className="p-3.5 rounded-2xl bg-[#f0f8fb] border border-[#cce4ee] text-xs text-[#2b7f8f] leading-relaxed font-medium">
+                  ℹ️{" "}
+                  {language === "bn"
+                    ? "উপসর্গভিত্তিক যত্ন: ছবির ফলাফল অনির্ণীত হলেও, নিচের পরামর্শসমূহ আপনার উল্লিখিত লক্ষণসমূহ ও ত্বকের স্বাভাবিক সুরক্ষার ওপর ভিত্তি করে তৈরি।"
+                    : "Symptom-Based Care: While photographic classification was inconclusive, the care guidance below is based on your reported symptoms and gentle skin barrier support."}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#2b7f8f] block">
+                  {language === "bn" ? "সম্ভাব্য দৃশ্যমান লক্ষণ" : "Possible visible concern"}
+                </span>
+                <h3 className="font-headline font-extrabold text-2xl text-[#192531] mt-0.5">
+                  {triage.main_finding || triage.primary_condition}
+                </h3>
+              </div>
+            )}
 
             <p className="text-sm text-[#4a5d6e] leading-relaxed">
               {triage.rationale}

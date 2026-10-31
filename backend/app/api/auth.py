@@ -161,6 +161,7 @@ def get_current_user_profile(user: User = Depends(get_current_user)):
         full_name=user.full_name,
         zero_cloud_retention=user.zero_cloud_retention,
         data_retention_days=user.data_retention_days,
+        ai_telemetry_opt_in=getattr(user, "ai_telemetry_opt_in", False),
         created_at=user.created_at
     )
 
@@ -172,7 +173,7 @@ def update_settings(
     db: Session = Depends(get_db)
 ):
     """
-    Updates user settings including zero-cloud image retention toggle and retention period.
+    Updates user settings including zero-cloud image retention toggle, retention period, and AI telemetry opt-in.
     """
     if settings_in.full_name is not None:
         user.full_name = settings_in.full_name.strip()
@@ -180,6 +181,8 @@ def update_settings(
         user.zero_cloud_retention = settings_in.zero_cloud_retention
     if settings_in.data_retention_days is not None:
         user.data_retention_days = max(0, min(3650, int(settings_in.data_retention_days)))
+    if settings_in.ai_telemetry_opt_in is not None:
+        user.ai_telemetry_opt_in = settings_in.ai_telemetry_opt_in
 
     db.commit()
     db.refresh(user)
@@ -190,6 +193,7 @@ def update_settings(
         full_name=user.full_name,
         zero_cloud_retention=user.zero_cloud_retention,
         data_retention_days=user.data_retention_days,
+        ai_telemetry_opt_in=getattr(user, "ai_telemetry_opt_in", False),
         created_at=user.created_at
     )
 

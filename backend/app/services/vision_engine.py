@@ -4,11 +4,15 @@ import time
 import os
 import base64
 import json
+import logging
 from typing import Dict, Any, List, Optional, Tuple
 from PIL import Image
 import numpy as np
 import httpx
 from app.core.config import settings
+from app.services.huggingface_adapter import huggingface_adapter
+
+logger = logging.getLogger(__name__)
 
 # Supported visual pattern families
 SUPPORTED_CONDITIONS = {
@@ -193,14 +197,160 @@ class VisionModelAdapter:
             "erythema_saturation": erythema_saturation
         }
 
-    def _infer_with_gemini(self, image_bytes: bytes) -> Optional[Dict[str, Any]]:
+    def get_ai_engine_status(self) -> Dict[str, Any]:
+        """
+        Check and monitor live operational availability of integrated AI engines (Gemini and Hugging Face).
+        """
+        gemini_ready = bool(self.api_key and len(self.api_key.strip()) > 5)
+        hf_ready = huggingface_adapter.is_configured()
+        primary = getattr(settings, "PRIMARY_AI_PROVIDER", "gemini")
+        hf_fallback_enabled = getattr(settings, "ENABLE_HUGGINGFACE_FALLBACK", False)
+
+        return {
+            "primary_provider": primary,
+            "gemini": {
+                "model_id": os.getenv("GEMINI_MODEL", getattr(settings, "AI_MODEL_BACKBONE", "gemini-3.5-flash-lite")),
+                "configured": gemini_ready,
+                "status": "ready" if gemini_ready else "unconfigured",
+                "supports_localization": True
+            },
+            "huggingface": {
+                "model_id": getattr(settings, "HF_MODEL_ID", "Jayanth2002/dinov2-base-finetuned-SkinDisease"),
+                "configured": hf_ready,
+                "status": "ready" if hf_ready else "unconfigured",
+                "fallback_enabled": hf_fallback_enabled,
+                "supports_localization": False
+            },
+            "active_mode": (
+                "gemini_primary" if (primary == "gemini" and gemini_ready)
+                else "huggingface_primary" if (primary == "huggingface" and hf_ready)
+                else "huggingface_fallback" if (not gemini_ready and hf_fallback_enabled and hf_ready)
+                else "inconclusive_safe_mode"
+            )
+        }
+
+    @staticmethod
+    def _map_hf_label_to_category(label: Optional[str]) -> Optional[str]:
+        """Maps Hugging Face DINOv2 labels to unified triage categories."""
+        if not label:
+            return None
+        l = label.lower()
+        if any(term in l for term in ("acne", "comedone", "pimple", "folliculitis")):
+            return "acne_vulgaris"
+        if any(term in l for term in ("eczema", "dermatitis", "atopic", "contact")):
+            return "eczema_contact_dermatitis"
+        if any(term in l for term in ("psoriasis", "plaque")):
+            return "psoriasis"
+        if any(term in l for term in ("tinea", "fungal", "ringworm", "athlete", "candidiasis", "mycosis")):
+            return "fungal_tinea"
+        if any(term in l for term in ("melanoma", "carcinoma", "dysplastic", "basal", "squamous", "keratoacanthoma")):
+            return "suspicious_dysplastic_lesion"
+        if any(term in l for term in ("nevus", "mole", "freckle", "lentigo", "macule", "melanocytic", "seborrheic keratosis")):
+            return "benign_melanocytic_macule"
+        return None
+
+    def _infer_with_huggingface(self, image_bytes: bytes) -> Dict[str, Any]:
+        """
+        Runs evaluated Hugging Face dermatology model inference (DINOv2) as an
+        alternative or fallback classifier when Gemini is unavailable.
+        """
+        if not huggingface_adapter.is_configured():
+            logger.info("Hugging Face API token is not configured; fallback inference skipped.")
+            return {
+                "status": "unavailable",
+                "status_reason": "Hugging Face inference token (HF_TOKEN) is not configured in backend environment.",
+                "matched_category": None,
+                "primary_concern": None,
+                "observed_patterns": [],
+                "bounding_box": None,
+                "confidence_assessment": "Inconclusive",
+                "uncertainty_rationale": "Alternative Hugging Face model credentials are not configured.",
+                "raw_model_response": None
+            }
+
+        try:
+            hf_res = huggingface_adapter.infer(image_bytes)
+            if not hf_res.get("success"):
+                logger.warning("Hugging Face inference failed or timed out: %s", hf_res.get("message"))
+                return {
+                    "status": "failed" if hf_res.get("status") in ("timeout", "error") else "inconclusive",
+                    "status_reason": hf_res.get("message", "Hugging Face vision inference failed."),
+                    "matched_category": None,
+                    "primary_concern": None,
+                    "observed_patterns": [],
+                    "bounding_box": None,
+                    "confidence_assessment": "Inconclusive",
+                    "uncertainty_rationale": hf_res.get("message", "Model returned error."),
+                    "raw_model_response": hf_res
+                }
+
+            top_label = hf_res.get("top_label")
+            top_score = hf_res.get("top_score", 0.0)
+            matched_cat = self._map_hf_label_to_category(top_label)
+
+            if matched_cat and top_score >= 0.20:
+                logger.info("Hugging Face DINOv2 matched category: %s (label: %s, score: %.2f)", matched_cat, top_label, top_score)
+                conf = "High" if top_score > 0.65 else "Moderate" if top_score > 0.35 else "Low"
+                return {
+                    "status": "successful",
+                    "status_reason": f"Visual pattern matched via Hugging Face DINOv2 model ({top_label}).",
+                    "matched_category": matched_cat,
+                    "primary_concern": SUPPORTED_CONDITIONS[matched_cat]["name"],
+                    "observed_patterns": [f"DINOv2 classification: {top_label} ({round(top_score * 100, 1)}%)"],
+                    "bounding_box": None,
+                    "confidence_assessment": conf,
+                    "uncertainty_rationale": (
+                        "Statistical feature similarity from DINOv2 image classification model. "
+                        "Localization is unsupported. In-person clinical dermatological evaluation required."
+                    ),
+                    "raw_model_response": hf_res
+                }
+            else:
+                return {
+                    "status": "inconclusive",
+                    "status_reason": f"Hugging Face model returned classification ({top_label}) that did not reliably map to supported triage patterns.",
+                    "matched_category": None,
+                    "primary_concern": "Inconclusive Visual Observation",
+                    "observed_patterns": [f"Top unmapped label: {top_label}"] if top_label else [],
+                    "bounding_box": None,
+                    "confidence_assessment": "Inconclusive",
+                    "uncertainty_rationale": "Model output did not achieve clear concordance with recognized triage categories.",
+                    "raw_model_response": hf_res
+                }
+        except Exception as e:
+            logger.error("Hugging Face inference adapter encountered unexpected error: %s", str(e))
+            return {
+                "status": "failed",
+                "status_reason": f"Unexpected error during Hugging Face inference: {str(e)}",
+                "matched_category": None,
+                "primary_concern": None,
+                "observed_patterns": [],
+                "bounding_box": None,
+                "confidence_assessment": "Inconclusive",
+                "uncertainty_rationale": "Server error during alternative model inference.",
+                "raw_model_response": None
+            }
+
+    def _infer_with_gemini(self, image_bytes: bytes) -> Dict[str, Any]:
         """
         Executes genuine multimodal AI vision inference using Gemini Vision API.
         Extracts visible patterns, localization bounding box [ymin, xmin, ymax, xmax],
-        and calibrated uncertainty rationale.
+        and explicit uncertainty rationale.
+        Safely records errors with structured server-side logging without leaking secrets or PII.
         """
         if not self.is_configured():
-            return None
+            logger.info("Gemini API key is not configured; visual inference skipped.")
+            return {
+                "status": "unavailable",
+                "status_reason": "Automated visual analysis is unconfigured or offline.",
+                "matched_category": None,
+                "primary_concern": None,
+                "observed_patterns": [],
+                "bounding_box": None,
+                "confidence_assessment": "Inconclusive",
+                "uncertainty_rationale": "Automated AI classification is offline. Assessment is based on symptom questionnaire and conservative self-care guidance.",
+                "raw_model_response": None
+            }
 
         try:
             b64_image = base64.b64encode(image_bytes).decode("utf-8")
@@ -240,18 +390,141 @@ Respond strictly with valid JSON conforming to this schema:
                 }
             }
 
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={self.api_key}"
+            model_name = os.getenv("GEMINI_MODEL", getattr(settings, "AI_MODEL_BACKBONE", "gemini-1.5-flash"))
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
             response = httpx.post(url, json=payload, timeout=20.0)
 
-            if response.status_code == 200:
-                data = response.json()
-                text = data["candidates"][0]["content"]["parts"][0]["text"]
-                parsed = json.loads(text)
-                return parsed
-        except Exception:
-            pass
+            if response.status_code != 200:
+                logger.error(
+                    "Gemini API returned non-200 HTTP status %d: %s",
+                    response.status_code,
+                    response.text[:200]
+                )
+                return {
+                    "status": "failed",
+                    "status_reason": "Visual analysis service encountered an error while processing the image.",
+                    "matched_category": None,
+                    "primary_concern": None,
+                    "observed_patterns": [],
+                    "bounding_box": None,
+                    "confidence_assessment": "Inconclusive",
+                    "uncertainty_rationale": "Visual analysis provider returned an error.",
+                    "raw_model_response": None
+                }
 
-        return None
+            data = response.json()
+            candidates = data.get("candidates", [])
+            if not candidates or "content" not in candidates[0] or "parts" not in candidates[0]["content"]:
+                logger.warning("Gemini response missing candidate parts or was filtered by safety policies.")
+                return {
+                    "status": "inconclusive",
+                    "status_reason": "Image could not be evaluated by the visual model due to safety filtering or empty candidates.",
+                    "matched_category": None,
+                    "primary_concern": "Inconclusive Observation",
+                    "observed_patterns": [],
+                    "bounding_box": None,
+                    "confidence_assessment": "Inconclusive",
+                    "uncertainty_rationale": "The visual model did not return candidates for this image.",
+                    "raw_model_response": None
+                }
+
+            text = candidates[0]["content"]["parts"][0].get("text", "")
+            try:
+                parsed = json.loads(text)
+            except (json.JSONDecodeError, TypeError) as json_err:
+                logger.error("Failed to parse Gemini response JSON: %s (first 100 chars: %s)", type(json_err).__name__, str(text)[:100])
+                return {
+                    "status": "failed",
+                    "status_reason": "Visual analysis model output was malformed.",
+                    "matched_category": None,
+                    "primary_concern": None,
+                    "observed_patterns": [],
+                    "bounding_box": None,
+                    "confidence_assessment": "Inconclusive",
+                    "uncertainty_rationale": "Model response was not valid JSON.",
+                    "raw_model_response": None
+                }
+
+            raw_category = parsed.get("matched_category")
+            if raw_category == "inconclusive":
+                logger.info("Gemini visual model returned explicit inconclusive classification.")
+                return {
+                    "status": "inconclusive",
+                    "status_reason": "Visual pattern analysis was inconclusive. The image features did not match a recognized condition pattern.",
+                    "matched_category": None,
+                    "primary_concern": parsed.get("primary_concern", "Inconclusive Visual Observation"),
+                    "observed_patterns": parsed.get("observed_patterns", []),
+                    "bounding_box": parsed.get("bounding_box"),
+                    "confidence_assessment": "Inconclusive",
+                    "uncertainty_rationale": parsed.get("uncertainty_rationale", "The visual characteristics in the photograph could not be reliably categorized."),
+                    "raw_model_response": parsed
+                }
+            elif raw_category in SUPPORTED_CONDITIONS:
+                logger.info("Gemini visual inference succeeded with category: %s", raw_category)
+                return {
+                    "status": "successful",
+                    "status_reason": "Visual pattern match identified.",
+                    "matched_category": raw_category,
+                    "primary_concern": parsed.get("primary_concern", SUPPORTED_CONDITIONS[raw_category]["name"]),
+                    "observed_patterns": parsed.get("observed_patterns", []),
+                    "bounding_box": parsed.get("bounding_box"),
+                    "confidence_assessment": parsed.get("confidence_assessment", "Moderate"),
+                    "uncertainty_rationale": parsed.get("uncertainty_rationale", "Automated visual pattern match. Medical evaluation required for clinical diagnosis."),
+                    "raw_model_response": parsed
+                }
+            else:
+                logger.warning("Gemini visual model returned unsupported category: %s", raw_category)
+                return {
+                    "status": "inconclusive",
+                    "status_reason": f"Visual pattern analysis returned an unsupported pattern category: {raw_category}.",
+                    "matched_category": None,
+                    "primary_concern": parsed.get("primary_concern", "Unrecognized Pattern"),
+                    "observed_patterns": parsed.get("observed_patterns", []),
+                    "bounding_box": parsed.get("bounding_box"),
+                    "confidence_assessment": "Inconclusive",
+                    "uncertainty_rationale": "The visual category returned is outside the recognized condition classes.",
+                    "raw_model_response": parsed
+                }
+
+        except httpx.TimeoutException:
+            logger.warning("Gemini API request timed out after 20.0s.")
+            return {
+                "status": "failed",
+                "status_reason": "Visual analysis service timed out. Please try again.",
+                "matched_category": None,
+                "primary_concern": None,
+                "observed_patterns": [],
+                "bounding_box": None,
+                "confidence_assessment": "Inconclusive",
+                "uncertainty_rationale": "Visual inference request timed out.",
+                "raw_model_response": None
+            }
+        except httpx.RequestError as req_err:
+            logger.error("Gemini API connection error: %s", type(req_err).__name__)
+            return {
+                "status": "failed",
+                "status_reason": "Visual analysis service could not be reached.",
+                "matched_category": None,
+                "primary_concern": None,
+                "observed_patterns": [],
+                "bounding_box": None,
+                "confidence_assessment": "Inconclusive",
+                "uncertainty_rationale": "Visual inference request connection failed.",
+                "raw_model_response": None
+            }
+        except Exception as exc:
+            logger.error("Unexpected error in Gemini inference: %s", type(exc).__name__)
+            return {
+                "status": "failed",
+                "status_reason": "An unexpected error occurred during visual analysis.",
+                "matched_category": None,
+                "primary_concern": None,
+                "observed_patterns": [],
+                "bounding_box": None,
+                "confidence_assessment": "Inconclusive",
+                "uncertainty_rationale": "Inference failed due to an unexpected server exception.",
+                "raw_model_response": None
+            }
 
     def infer(self, image_bytes: bytes) -> Dict[str, Any]:
         """
@@ -260,7 +533,7 @@ Respond strictly with valid JSON conforming to this schema:
         2. Skin-region identification (color-space loci).
         3. Objective morphological feature extraction.
         4. Multimodal inference via Gemini Vision API (if configured).
-        5. Honest uncertainty and out-of-distribution (OOD) flag.
+        5. Honest uncertainty and explicit inference status (successful, inconclusive, unavailable, failed).
         """
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         analysis_img = img.resize((256, 256), Image.Resampling.BILINEAR)
@@ -277,10 +550,17 @@ Respond strictly with valid JSON conforming to this schema:
             return {
                 "model_version": self.version,
                 "backend": self.backend_type,
+                "inference_status": "inconclusive",
+                "inference_status_reason": "Insufficient skin pixels identified in photograph.",
+                "is_inconclusive": True,
                 "skin_detection": skin_metrics,
                 "morphological_features": features,
-                "calibrated_probabilities": {k: 0.1667 for k in SUPPORTED_CONDITIONS},
-                "top_predictions": [(k, 0.1667) for k in SUPPORTED_CONDITIONS],
+                "observed_pattern_scores": {},
+                "calibrated_probabilities": {},
+                "is_uncalibrated_heuristic": True,
+                "is_clinical_probability": False,
+                "clinical_disclaimer": "Heuristic pattern similarity score only; not a clinically calibrated probability.",
+                "top_predictions": [],
                 "detected_area": {
                     "has_detection": False,
                     "bounding_box": None,
@@ -299,16 +579,46 @@ Respond strictly with valid JSON conforming to this schema:
                 }
             }
 
-        # 3. Multimodal Model Inference
-        gemini_result = self._infer_with_gemini(image_bytes)
+        # 3. Multimodal Model Inference with Controlled Alternative / Fallback
+        primary_provider = getattr(settings, "PRIMARY_AI_PROVIDER", "gemini")
+        enable_hf_fallback = getattr(settings, "ENABLE_HUGGINGFACE_FALLBACK", False)
+        
+        active_result = None
+        active_backend = self.backend_type
 
-        # 4. Uncalibrated Heuristic Pattern Scores & Spatial Localization
-        # Note: These are heuristic visual similarity scores from multimodal prompting,
-        # NOT clinically validated, calibrated disease probabilities.
-        raw_scores = {k: 0.10 for k in SUPPORTED_CONDITIONS}
+        if primary_provider == "huggingface":
+            # Primary: Hugging Face DINOv2
+            active_result = self._infer_with_huggingface(image_bytes)
+            active_backend = "Hugging Face DINOv2 Base Vision Engine"
+            # Fallback to Gemini if Hugging Face was unconfigured/failed
+            if active_result["status"] != "successful" and self.is_configured():
+                logger.info("Hugging Face inference unconfigured/failed; evaluating fallback to Gemini.")
+                gemini_fallback = self._infer_with_gemini(image_bytes)
+                if gemini_fallback["status"] == "successful":
+                    active_result = gemini_fallback
+                    active_backend = "Gemini-3.5-Flash Multimodal Vision Engine (Fallback)"
+        else:
+            # Primary: Gemini (default)
+            active_result = self._infer_with_gemini(image_bytes)
+            active_backend = "Gemini-3.5-Flash Multimodal Vision Engine"
+            # Fallback to Hugging Face if Gemini is unavailable/failed and fallback is enabled
+            if (
+                active_result["status"] in ("unavailable", "failed")
+                and enable_hf_fallback
+                and huggingface_adapter.is_configured()
+            ):
+                logger.info("Gemini unavailable/failed; evaluating fallback to Hugging Face DINOv2 adapter.")
+                hf_fallback = self._infer_with_huggingface(image_bytes)
+                if hf_fallback["status"] == "successful":
+                    active_result = hf_fallback
+                    active_backend = "Hugging Face DINOv2 Base Vision Engine (Fallback)"
 
-        if gemini_result and gemini_result.get("matched_category") in raw_scores:
-            matched_cat = gemini_result["matched_category"]
+        inference_status = active_result["status"]
+        inference_status_reason = active_result["status_reason"]
+
+        if inference_status == "successful":
+            matched_cat = active_result["matched_category"]
+            raw_scores = {k: 0.05 for k in SUPPORTED_CONDITIONS}
             raw_scores[matched_cat] = 0.70
 
             # Distribute remaining heuristic weight evenly
@@ -324,80 +634,74 @@ Respond strictly with valid JSON conforming to this schema:
             margin = round(top1_score - top2_score, 3)
             normalized_entropy = 0.52
             is_ood = False
-            uncertainty_level = gemini_result.get("confidence_assessment", "Moderate")
-            uncertainty_rationale = gemini_result.get(
+            uncertainty_level = active_result.get("confidence_assessment", "Moderate")
+            uncertainty_rationale = active_result.get(
                 "uncertainty_rationale",
                 "Automated visual pattern observation. Uncalibrated heuristic score. Medical evaluation required for clinical diagnosis."
             )
+            is_inconclusive = False
+            calibrated_probs = pattern_scores
 
-        elif self.is_configured():
-            # Gemini was configured but inference returned inconclusive or network failed
-            pattern_scores = {k: round(1.0 / len(raw_scores), 4) for k in raw_scores}
-            sorted_predictions = list(pattern_scores.items())
-            margin = 0.0
-            normalized_entropy = 1.0
-            is_ood = True
-            uncertainty_level = "Inconclusive"
-            uncertainty_rationale = "Image analysis was inconclusive. The visual characteristics could not be reliably categorized. Clinical validation required."
+            # Bounding box
+            detected_area: Dict[str, Any] = {
+                "has_detection": False,
+                "bounding_box": None,
+                "label": active_result.get("primary_concern"),
+                "is_supported": active_result.get("bounding_box") is not None,
+                "notes": "Diffuse pattern observed; no single localized lesion isolated."
+            }
+            if active_result.get("bounding_box"):
+                bbox = active_result["bounding_box"]
+                if isinstance(bbox, dict) and all(k in bbox for k in ("ymin", "xmin", "ymax", "xmax")):
+                    detected_area = {
+                        "has_detection": True,
+                        "bounding_box": {
+                            "ymin": int(bbox["ymin"]),
+                            "xmin": int(bbox["xmin"]),
+                            "ymax": int(bbox["ymax"]),
+                            "xmax": int(bbox["xmax"]),
+                        },
+                        "label": active_result.get("primary_concern", "Observed Area"),
+                        "is_supported": True,
+                        "notes": "Model-identified area of visible observation."
+                    }
         else:
-            # No remote AI model configured: report honest baseline without pretending to have a clinical model
-            pattern_scores = {k: round(1.0 / len(raw_scores), 4) for k in raw_scores}
-            sorted_predictions = list(pattern_scores.items())
+            # Inference is unavailable, inconclusive, or failed.
+            # Do NOT fabricate uniform category scores or fake condition predictions!
+            is_inconclusive = True
+            calibrated_probs = {}
+            sorted_predictions = []
             margin = 0.0
             normalized_entropy = 1.0
             is_ood = True
             uncertainty_level = "Inconclusive"
-            uncertainty_rationale = "Automated AI classification is offline. Assessment is based on symptom questionnaire and conservative self-care guidance."
+            uncertainty_rationale = inference_status_reason
 
-        calibrated_probs = pattern_scores
-
-        # 5. Detected Area Object
-        detected_area: Dict[str, Any] = {
-            "has_detection": False,
-            "bounding_box": None,
-            "label": None,
-            "is_supported": False,
-            "notes": "Localization overlay is not supported without an active trained vision model."
-        }
-
-        if gemini_result and gemini_result.get("bounding_box"):
-            bbox = gemini_result["bounding_box"]
-            if isinstance(bbox, dict) and all(k in bbox for k in ("ymin", "xmin", "ymax", "xmax")):
-                detected_area = {
-                    "has_detection": True,
-                    "bounding_box": {
-                        "ymin": int(bbox["ymin"]),
-                        "xmin": int(bbox["xmin"]),
-                        "ymax": int(bbox["ymax"]),
-                        "xmax": int(bbox["xmax"]),
-                    },
-                    "label": gemini_result.get("primary_concern", "Observed Area"),
-                    "is_supported": True,
-                    "notes": "Model-identified area of visible observation."
-                }
-        elif gemini_result:
             detected_area = {
                 "has_detection": False,
                 "bounding_box": None,
-                "label": gemini_result.get("primary_concern"),
-                "is_supported": True,
-                "notes": "Diffuse pattern observed; no single localized lesion isolated."
+                "label": None,
+                "is_supported": False,
+                "notes": inference_status_reason
             }
 
         return {
             "model_version": self.version,
-            "backend": self.backend_type,
+            "backend": active_backend,
+            "inference_status": inference_status,
+            "inference_status_reason": inference_status_reason,
+            "is_inconclusive": is_inconclusive,
             "skin_detection": skin_metrics,
             "morphological_features": features,
             "observed_pattern_scores": calibrated_probs,
-            "calibrated_probabilities": calibrated_probs,  # Retained as alias for triage routing
+            "calibrated_probabilities": calibrated_probs,
             "is_uncalibrated_heuristic": True,
             "is_clinical_probability": False,
             "clinical_disclaimer": "Heuristic pattern similarity score only; not a clinically calibrated probability.",
             "top_predictions": sorted_predictions,
             "detected_area": detected_area,
-            "ai_observations": gemini_result.get("observed_patterns", []) if gemini_result else [],
-            "gemini_inference": gemini_result,
+            "ai_observations": active_result.get("observed_patterns", []) if active_result else [],
+            "gemini_inference": active_result,
             "uncertainty_metrics": {
                 "normalized_entropy": normalized_entropy,
                 "confidence_margin": margin,

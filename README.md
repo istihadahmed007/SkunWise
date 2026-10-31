@@ -152,10 +152,20 @@ cd backend
 
 ---
 
-## 📋 Pre-Seeded Demonstration Account
+## 📋 Demonstration Account (Development Only)
 
-The backend automatically creates a demonstration account upon first startup:
+In development environments, demonstration data can be enabled by setting `SEED_DEMO_DATA=true` in `backend/.env` (disabled by default in production for patient privacy and security):
 - **Email**: `sarah.jenkins@example.com`
 - **Password**: `SkinWise2026!`
-- **Role**: Patient with verified consent and sample baseline clinical assessment.
+- **Role**: Patient with verified consent and sample baseline clinical assessments.
+
+---
+
+## 🔒 Production Deployment & Security Requirements
+
+Before deploying to production (e.g. Vercel, Railway, AWS, Docker):
+1. **Durable Database**: Configure a managed PostgreSQL database via `DATABASE_URL` (e.g. `postgresql://user:pass@host:5432/skinwise`). Ephemeral SQLite in `/tmp` is strictly rejected in production to prevent patient record loss.
+2. **Cryptographic Secrets**: Provide a high-entropy `SECRET_KEY` ($\ge 32$ characters) and an independent `WORKER_SECRET` ($\ge 32$ characters) for background retention jobs.
+3. **AI Vision Configuration**: Provide `GEMINI_API_KEY` for the primary multimodal vision pipeline. Optionally set `ENABLE_HUGGINGFACE_FALLBACK=true` and provide `HF_TOKEN` for evaluated DINOv2 backup classification.
+4. **Environment Detection**: Set `ENVIRONMENT=production` (Vercel deployments automatically detect `VERCEL_ENV=production`). Fail-closed checks enforce valid security credentials before serving traffic.
 

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import List
+from pydantic import model_validator, ConfigDict
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -8,11 +9,27 @@ is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"
 default_db = "sqlite:////tmp/skinwise.db" if is_serverless else f"sqlite:///{BASE_DIR}/skinwise.db"
 default_storage = Path("/tmp/skinwise_storage") if is_serverless else BASE_DIR / "storage"
 
+def detect_environment() -> str:
+    """
+    Reliably detect execution environment across bare-metal, containers, and Vercel serverless.
+    Prioritizes explicit ENVIRONMENT, then Vercel/Node deployment variables.
+    """
+    env = os.getenv("ENVIRONMENT")
+    if env and env.strip():
+        return env.lower().strip()
+    vercel_env = os.getenv("VERCEL_ENV")
+    if vercel_env and vercel_env.strip():
+        return vercel_env.lower().strip()
+    node_env = os.getenv("NODE_ENV")
+    if node_env and node_env.strip():
+        return node_env.lower().strip()
+    return "development"
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SkinWise AI"
     VERSION: str = "4.2.1-derm-triage"
     API_V1_STR: str = "/api"
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    ENVIRONMENT: str = detect_environment()
     SEED_DEMO_DATA: bool = os.getenv("SEED_DEMO_DATA", "false").lower() == "true"
     
     WORKER_SECRET: str = os.getenv("WORKER_SECRET", "skinwise-local-worker-secret-internal-use-only")
@@ -25,6 +42,7 @@ class Settings(BaseSettings):
     GUEST_TOKEN_EXPIRE_MINUTES: int = 60 * 24       # 24 hours for guest assessments
     
     DATABASE_URL: str = os.getenv("DATABASE_URL", default_db)
+    ALLOW_EPHEMERAL_DATABASE_IN_PRODUCTION: bool = os.getenv("ALLOW_EPHEMERAL_DATABASE_IN_PRODUCTION", "false").lower() == "true"
     
     # Private Storage configuration
     STORAGE_DIR: Path = Path(os.getenv("STORAGE_DIR", str(default_storage)))
@@ -41,7 +59,12 @@ class Settings(BaseSettings):
     MAX_GLARE_RATIO: float = 0.08
     
     # AI Engine Configuration
+    PRIMARY_AI_PROVIDER: str = os.getenv("PRIMARY_AI_PROVIDER", "gemini").lower().strip()
+    ENABLE_HUGGINGFACE_FALLBACK: bool = os.getenv("ENABLE_HUGGINGFACE_FALLBACK", "false").lower() == "true"
     AI_MODEL_BACKBONE: str = "gemini-3.5-flash-lite"
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+    
     HF_TOKEN: str = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY", "")
     HF_MODEL_ID: str = os.getenv("HF_MODEL_ID", "Jayanth2002/dinov2-base-finetuned-SkinDisease")
     HF_ROUTER_URL: str = "https://router.huggingface.co/hf-inference/models"
@@ -67,31 +90,62 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3001",
     ]
 
-    class Config:
-        case_sensitive = True
+    model_config = ConfigDict(case_sensitive=True)
+
+    @model_validator(mode="after")
+    def validate_production_security(self):
+        env_normalized = (self.ENVIRONMENT or "").lower().strip()
+        if env_normalized not in ("development", "test"):
+            insecure_keys = [
+                "skinwise-dev-clinical-insecure-key-change-in-production",
+                "skinwise-super-secret-clinical-key-2026-production-grade",
+                "replace_with_a_secure_random_64_char_key_for_production",
+                "secret",
+                "changeme"
+            ]
+            if (
+                not self.SECRET_KEY
+                or len(self.SECRET_KEY.strip()) < 32
+                or self.SECRET_KEY in insecure_keys
+                or "change-in-production" in self.SECRET_KEY
+            ):
+                raise RuntimeError(
+                    "CRITICAL SECURITY CONFIGURATION ERROR: A high-entropy, production-grade SECRET_KEY "
+                    "(at least 32 characters) must be configured in environment variables for non-development environments."
+                )
+
+            # Worker secret must also be independent and securely configured in production
+            insecure_worker_keys = [
+                "skinwise-local-worker-secret-internal-use-only",
+                "worker-secret",
+                "secret",
+                "changeme"
+            ]
+            if (
+                not self.WORKER_SECRET
+                or len(self.WORKER_SECRET.strip()) < 32
+                or self.WORKER_SECRET in insecure_worker_keys
+                or self.WORKER_SECRET == self.SECRET_KEY
+            ):
+                raise RuntimeError(
+                    "CRITICAL SECURITY CONFIGURATION ERROR: An independent, high-entropy WORKER_SECRET "
+                    "(at least 32 characters, distinct from SECRET_KEY) must be configured for worker authorization in production."
+                )
+
+            # Guard against ephemeral /tmp SQLite storage in production
+            if (
+                self.DATABASE_URL.startswith("sqlite:////tmp")
+                and not self.ALLOW_EPHEMERAL_DATABASE_IN_PRODUCTION
+            ):
+                raise RuntimeError(
+                    "CRITICAL DATA PERSISTENCE CONFIGURATION ERROR: Ephemeral SQLite (/tmp/skinwise.db) cannot be used "
+                    "as the primary patient database in production. Configure a durable managed database via DATABASE_URL "
+                    "(e.g. PostgreSQL: postgresql://user:pass@host/dbname), or set ALLOW_EPHEMERAL_DATABASE_IN_PRODUCTION=true "
+                    "for temporary non-persistent preview deployments."
+                )
+        return self
 
 settings = Settings()
-
-# Enforce secure SECRET_KEY in all non-development/test deployments (Fail-closed)
-env_normalized = settings.ENVIRONMENT.lower().strip()
-if env_normalized not in ("development", "test"):
-    insecure_keys = [
-        "skinwise-dev-clinical-insecure-key-change-in-production",
-        "skinwise-super-secret-clinical-key-2026-production-grade",
-        "replace_with_a_secure_random_64_char_key_for_production",
-        "secret",
-        "changeme"
-    ]
-    if (
-        not settings.SECRET_KEY
-        or len(settings.SECRET_KEY.strip()) < 32
-        or settings.SECRET_KEY in insecure_keys
-        or "change-in-production" in settings.SECRET_KEY
-    ):
-        raise RuntimeError(
-            "CRITICAL SECURITY CONFIGURATION ERROR: A high-entropy, production-grade SECRET_KEY "
-            "(at least 32 characters) must be configured in environment variables for non-development environments."
-        )
 
 # Ensure directories exist
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

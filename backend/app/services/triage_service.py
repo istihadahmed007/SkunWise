@@ -83,14 +83,24 @@ class SafetyTriageService:
                 )
             }
 
-        # 3. Check for Visual Irregularity / Atypical spot
-        calibrated_probs = visual_findings.get("calibrated_probabilities", {})
-        morphology = visual_findings.get("morphological_features", {})
-        dysplasia_prob = calibrated_probs.get("suspicious_dysplastic_lesion", 0.0)
-        asymmetry = morphology.get("asymmetry_score", 0.0)
-        border_irreg = morphology.get("border_irregularity", 0.0)
+        # 3. Check for Visual Irregularity / Atypical spot (Only when visual inference is valid)
+        inference_status = visual_findings.get("inference_status", "inconclusive")
+        is_visual_successful = (inference_status == "successful") and not visual_findings.get("is_inconclusive", False)
 
-        is_dysplastic_concern = (dysplasia_prob >= 0.25) or (asymmetry > 0.28) or (border_irreg > 0.35)
+        is_dysplastic_concern = False
+        if is_visual_successful:
+            calibrated_probs = visual_findings.get("observed_pattern_scores") or visual_findings.get("calibrated_probabilities", {})
+            morphology = visual_findings.get("morphological_features", {})
+            dysplasia_prob = calibrated_probs.get("suspicious_dysplastic_lesion", 0.0)
+            asymmetry = morphology.get("asymmetry_score", 0.0)
+            border_irreg = morphology.get("border_irregularity", 0.0)
+            is_dysplastic_concern = (dysplasia_prob >= 0.25) or (asymmetry > 0.28) or (border_irreg > 0.35)
+        else:
+            morphology = visual_findings.get("morphological_features", {})
+            asymmetry = morphology.get("asymmetry_score", 0.0)
+            border_irreg = morphology.get("border_irregularity", 0.0)
+            if visual_findings.get("skin_detection", {}).get("skin_detected", False) and (asymmetry > 0.35 and border_irreg > 0.40):
+                is_dysplastic_concern = True
 
         # 4. Check for persistent, spreading, or distressing symptoms
         is_chronic_or_expanding = symptoms.duration_days > 14 or symptoms.is_spreading
@@ -105,7 +115,7 @@ class SafetyTriageService:
                 "emergency_warning_detected": False,
                 "emergency_warning_items": [],
                 "rationale": (
-                    "The photo shows a spot with somewhat uneven borders or coloring. "
+                    "Visual observation noted an atypical or irregular spot contour. "
                     "Photographs taken with a phone cannot determine whether a spot is concerning. "
                     "An in-person check by a doctor or dermatologist is recommended."
                 )
@@ -120,13 +130,26 @@ class SafetyTriageService:
                 "emergency_warning_detected": False,
                 "emergency_warning_items": [],
                 "rationale": (
-                    f"Your symptoms have lasted more than two weeks or are causing noticeable discomfort "
+                    f"Based on your reported symptoms: Duration of {symptoms.duration_days} days or noticeable discomfort "
                     f"(Itch: {symptoms.itch_score}/10, Pain: {symptoms.pain_score}/10). "
                     "An in-person examination by a healthcare professional is recommended to identify the cause and advise on safe relief."
                 )
             }
 
         # 5. Tier 1: Mild / Low-Acuity Presentation
+        if is_visual_successful:
+            tier1_rationale = (
+                "Based on reported symptoms and image observation, the skin concern appears mild and stable with no red flags reported. "
+                "Gentle cleansing and fragrance-free moisturizing are generally appropriate. "
+                "If it does not improve within 1 to 2 weeks, or begins to spread, itch more, or hurt, please consult a doctor."
+            )
+        else:
+            tier1_rationale = (
+                "Based on your questionnaire responses, no emergency warning signs or high symptom burdens were reported. "
+                "Because photographic pattern matching was inconclusive, monitor the area closely and practice gentle skin barrier care. "
+                "If discomfort worsens, redness spreads, or the area does not improve, schedule an in-person doctor check."
+            )
+
         return {
             "triage_tier": 1,
             "triage_name": "General Self-Care May Help",
@@ -134,11 +157,7 @@ class SafetyTriageService:
             "urgency_badge_color": "emerald",
             "emergency_warning_detected": False,
             "emergency_warning_items": [],
-            "rationale": (
-                "The visible skin concern appears mild and stable with no red flags reported. "
-                "Gentle cleansing and fragrance-free moisturizing are generally appropriate. "
-                "If it does not improve within 1 to 2 weeks, or begins to spread, itch more, or hurt, please consult a doctor."
-            )
+            "rationale": tier1_rationale
         }
 
 triage_service = SafetyTriageService()

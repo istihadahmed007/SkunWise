@@ -52,7 +52,8 @@ def test_full_skin_analyze_and_retrieve_flow(client):
     assert res_data["session_code"].startswith("SW-")
     assert res_data["quality_metrics"]["is_acceptable"] is True
     assert res_data["triage"]["triage_tier"] in (1, 2, 3)
-    assert len(res_data["triage"]["possible_conditions"]) > 0
+    assert res_data["triage"]["is_inconclusive"] is True
+    assert res_data["triage"]["inference_status"] in ("inconclusive", "unavailable", "failed")
     assert len(res_data["triage"]["safe_self_care"]) > 0
     assert len(res_data["triage"]["diagnostic_gaps"]) >= 3
 

@@ -69,7 +69,13 @@ export default function AssessPage() {
         ? "ছবির মান পর্যাপ্ত স্পষ্ট নয়। অনুগ্রহ করে পর্যাপ্ত আলোতে ঝাপসা ছাড়া পরিষ্কার ছবি তুলুন।"
         : "Photo quality was insufficient for visual pattern matching. Please capture a clear, steady photo in natural daylight.";
     }
-    if (lower.includes("skin") || lower.includes("pixel") || lower.includes("locus")) {
+    if (
+      lower.includes("insufficient skin") ||
+      lower.includes("skin pixel") ||
+      lower.includes("skin locus") ||
+      lower.includes("non-skin") ||
+      lower.includes("skin coverage")
+    ) {
       return language === "bn"
         ? "ছবিতে পর্যাপ্ত ত্বক শনাক্ত করা যায়নি। অনুগ্রহ করে সরাসরি ত্বকের স্পষ্ট ছবি আপলোড করুন।"
         : "Insufficient skin area visible in the photo. Please provide a clear, focused image of the skin concern.";
@@ -79,10 +85,20 @@ export default function AssessPage() {
         ? "লক্ষণ ও তথ্যের ফর্ম প্রক্রিয়াকরণে সমস্যা হয়েছে। অনুগ্রহ করে তথ্য পুনরায় পরীক্ষা করে চেষ্টা করুন।"
         : "There was an issue processing your symptom inputs. Please review your answers and try again.";
     }
-    if (lower.includes("timeout") || lower.includes("503") || lower.includes("connection") || lower.includes("failed to fetch")) {
+    if (
+      lower.includes("timeout") ||
+      lower.includes("503") ||
+      lower.includes("500") ||
+      lower.includes("502") ||
+      lower.includes("404") ||
+      lower.includes("connection") ||
+      lower.includes("failed to fetch") ||
+      lower.includes("network") ||
+      lower.includes("failed with status")
+    ) {
       return language === "bn"
-        ? "সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি। অনুগ্রহ করে আপনার ইন্টারনেট সংযোগ পরীক্ষা করে পুনরায় চেষ্টা করুন।"
-        : "Unable to connect to the analysis service. Please check your network connection and try again.";
+        ? "সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি। অনুগ্রহ করে ব্যাকএন্ড সার্ভার চালু রয়েছে কিনা তা পরীক্ষা করুন।"
+        : "Unable to connect to the analysis service. Please ensure the backend server is running and try again.";
     }
     return rawError;
   };

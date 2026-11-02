@@ -85,9 +85,9 @@ class SkinRegionDetector:
         cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b
         cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b
 
-        ycbcr_mask = (y > 20) & (cb >= 77) & (cb <= 138) & (cr >= 128) & (cr <= 182)
+        ycbcr_mask = (y > 15) & (cb >= 70) & (cb <= 142) & (cr >= 122) & (cr <= 185)
 
-        # HSV rule for melanin and light tones
+        # HSV rule for melanin and light tones, plus red erythema wrapping around 360 degrees
         max_c = np.maximum(np.maximum(r, g), b)
         min_c = np.minimum(np.minimum(r, g), b)
         delta = max_c - min_c + 1e-5
@@ -104,15 +104,15 @@ class SkinRegionDetector:
         s = delta / (max_c + 1e-5)
         v = max_c / 255.0
 
-        hsv_mask = (h >= 0) & (h <= 55) & (s >= 0.15) & (s <= 0.85) & (v >= 0.15)
+        hsv_mask = ((h <= 55) | (h >= 330)) & (s >= 0.10) & (s <= 0.88) & (v >= 0.10)
 
         combined_mask = ycbcr_mask | hsv_mask
         skin_pixel_count = int(np.count_nonzero(combined_mask))
         total_pixels = int(combined_mask.size)
         coverage_ratio = round(skin_pixel_count / max(1, total_pixels), 3)
 
-        # Minimum 15% skin coverage required to consider photo a valid dermatological intake
-        is_skin = coverage_ratio >= 0.15
+        # Minimum 8% skin coverage required to consider photo a valid dermatological intake
+        is_skin = coverage_ratio >= 0.08
 
         return is_skin, coverage_ratio, {
             "skin_coverage_ratio": coverage_ratio,

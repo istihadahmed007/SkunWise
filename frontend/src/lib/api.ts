@@ -390,8 +390,8 @@ export const api = {
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: "Skin analysis failed" }));
-      throw new Error(err.detail || "Skin analysis failed");
+      const err = await res.json().catch(() => ({ detail: `Request failed with status ${res.status}` }));
+      throw new Error(err.detail || `Request failed with status ${res.status}`);
     }
     const data: Assessment = await res.json();
     if (data.guest_access_token && typeof window !== "undefined") {

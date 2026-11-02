@@ -11,6 +11,7 @@ import numpy as np
 import httpx
 from app.core.config import settings
 from app.services.huggingface_adapter import huggingface_adapter
+from app.services.dinov2_classifier import dinov2_classifier
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +250,60 @@ class VisionModelAdapter:
             return "benign_melanocytic_macule"
         return None
 
+    def _infer_with_dinov2(self, image_bytes: bytes) -> Dict[str, Any]:
+        """
+        Inference using the evaluated DINOv2 skin disease model:
+        1. Attempts local PyTorch inference with singleton DINOv2SkinClassifier.
+        2. Falls back to remote Hugging Face adapter if local model is unavailable or unconfigured.
+        """
+        try:
+            local_res = dinov2_classifier.predict(image_bytes)
+            if local_res.get("success"):
+                top_label = local_res.get("top_label")
+                top_score = local_res.get("top_score", 0.0)
+                top_predictions = local_res.get("top_predictions", [])
+                mapped_cat = local_res.get("mapped_category")
+                track = local_res.get("track", "")
+                
+                if mapped_cat != "inconclusive" and top_score >= 0.20:
+                    conf = "High" if top_score > 0.65 else "Moderate" if top_score > 0.35 else "Low"
+                    return {
+                        "status": "successful",
+                        "status_reason": f"Visual pattern matched via DINOv2 model ({top_label}, {round(top_score*100, 1)}%).",
+                        "matched_category": mapped_cat,
+                        "primary_concern": local_res.get("top_display_name", top_label),
+                        "observed_patterns": [f"{p['label']} ({p['confidence_pct']}%) - {p['track']}" for p in top_predictions],
+                        "bounding_box": None,
+                        "confidence_assessment": conf,
+                        "uncertainty_rationale": (
+                            f"Statistical feature similarity from DINOv2 model ({track}). "
+                            f"Top candidate: {top_label} (model score {top_score:.2f}). "
+                            "Model does not perform pixel localization. Physical clinical examination required."
+                        ),
+                        "predictions": top_predictions,
+                        "top_score": top_score,
+                        "raw_model_response": local_res
+                    }
+                else:
+                    return {
+                        "status": "inconclusive",
+                        "status_reason": f"DINOv2 model returned ambiguous classification (top score {top_score:.2f} for {top_label}).",
+                        "matched_category": None,
+                        "primary_concern": "Inconclusive Visual Observation",
+                        "observed_patterns": [f"Ambiguous prediction: {top_label} ({round(top_score*100, 1)}%)"],
+                        "bounding_box": None,
+                        "confidence_assessment": "Inconclusive",
+                        "uncertainty_rationale": "Model confidence is below reliable classification threshold.",
+                        "predictions": top_predictions,
+                        "top_score": top_score,
+                        "raw_model_response": local_res
+                    }
+        except Exception as e:
+            logger.warning("Local DINOv2 inference error: %s; evaluating remote Hugging Face adapter.", str(e))
+
+        # Remote adapter fallback
+        return self._infer_with_huggingface(image_bytes)
+
     def _infer_with_huggingface(self, image_bytes: bytes) -> Dict[str, Any]:
         """
         Runs evaluated Hugging Face dermatology model inference (DINOv2) as an
@@ -296,13 +351,15 @@ class VisionModelAdapter:
                     "status_reason": f"Visual pattern matched via Hugging Face DINOv2 model ({top_label}).",
                     "matched_category": matched_cat,
                     "primary_concern": SUPPORTED_CONDITIONS[matched_cat]["name"],
-                    "observed_patterns": [f"DINOv2 classification: {top_label} ({round(top_score * 100, 1)}%)"],
+                    "observed_patterns": [f"DINOv2 classification: {p.get('label')} ({round(p.get('score', 0.0) * 100, 1)}%)" for p in hf_res.get("predictions", [])],
                     "bounding_box": None,
                     "confidence_assessment": conf,
                     "uncertainty_rationale": (
                         "Statistical feature similarity from DINOv2 image classification model. "
                         "Localization is unsupported. In-person clinical dermatological evaluation required."
                     ),
+                    "predictions": hf_res.get("predictions", []),
+                    "top_score": top_score,
                     "raw_model_response": hf_res
                 }
             else:
@@ -315,6 +372,8 @@ class VisionModelAdapter:
                     "bounding_box": None,
                     "confidence_assessment": "Inconclusive",
                     "uncertainty_rationale": "Model output did not achieve clear concordance with recognized triage categories.",
+                    "predictions": hf_res.get("predictions", []),
+                    "top_score": top_score,
                     "raw_model_response": hf_res
                 }
         except Exception as e:
@@ -579,92 +638,137 @@ Respond strictly with valid JSON conforming to this schema:
                 }
             }
 
-        # 3. Multimodal Model Inference with Controlled Alternative / Fallback
-        primary_provider = getattr(settings, "PRIMARY_AI_PROVIDER", "gemini")
-        enable_hf_fallback = getattr(settings, "ENABLE_HUGGINGFACE_FALLBACK", False)
+        # 3. Model Inference Pipeline
+        primary_provider = getattr(settings, "PRIMARY_AI_PROVIDER", "dinov2").lower().strip()
+        enable_hf_fallback = getattr(settings, "ENABLE_HUGGINGFACE_FALLBACK", True)
         
         active_result = None
         active_backend = self.backend_type
+        supplementary_gemini = None
 
-        if primary_provider == "huggingface":
-            # Primary: Hugging Face DINOv2
-            active_result = self._infer_with_huggingface(image_bytes)
-            active_backend = "Hugging Face DINOv2 Base Vision Engine"
-            # Fallback to Gemini if Hugging Face was unconfigured/failed
+        if primary_provider in ("dinov2", "huggingface", "local"):
+            # Try DINOv2 classifier (local model first, remote HF adapter fallback)
+            active_result = self._infer_with_dinov2(image_bytes)
+            active_backend = "DINOv2 Base Vision Transformer (Jayanth2002/dinov2-base-finetuned-SkinDisease)"
+            
+            # If DINOv2 inference was unconfigured or failed, evaluate Gemini fallback
             if active_result["status"] != "successful" and self.is_configured():
-                logger.info("Hugging Face inference unconfigured/failed; evaluating fallback to Gemini.")
-                gemini_fallback = self._infer_with_gemini(image_bytes)
-                if gemini_fallback["status"] == "successful":
-                    active_result = gemini_fallback
+                logger.info("DINOv2 inference unavailable/failed; evaluating fallback to Gemini multimodal vision.")
+                gemini_res = self._infer_with_gemini(image_bytes)
+                if gemini_res["status"] == "successful":
+                    active_result = gemini_res
                     active_backend = "Gemini-3.5-Flash Multimodal Vision Engine (Fallback)"
+            elif active_result["status"] == "successful" and self.is_configured():
+                # Supplementary Gemini call for natural-language observations and localization overlay
+                try:
+                    supplementary_gemini = self._infer_with_gemini(image_bytes)
+                except Exception as e:
+                    logger.debug("Supplementary Gemini visual observation call skipped: %s", e)
         else:
-            # Primary: Gemini (default)
+            # Primary: Gemini
             active_result = self._infer_with_gemini(image_bytes)
             active_backend = "Gemini-3.5-Flash Multimodal Vision Engine"
-            # Fallback to Hugging Face if Gemini is unavailable/failed and fallback is enabled
+            # Fallback to DINOv2 if Gemini is unavailable/failed and fallback is enabled
             if (
                 active_result["status"] in ("unavailable", "failed")
                 and enable_hf_fallback
-                and huggingface_adapter.is_configured()
             ):
-                logger.info("Gemini unavailable/failed; evaluating fallback to Hugging Face DINOv2 adapter.")
-                hf_fallback = self._infer_with_huggingface(image_bytes)
-                if hf_fallback["status"] == "successful":
-                    active_result = hf_fallback
-                    active_backend = "Hugging Face DINOv2 Base Vision Engine (Fallback)"
+                logger.info("Gemini unavailable/failed; evaluating fallback to DINOv2 vision adapter.")
+                dino_res = self._infer_with_dinov2(image_bytes)
+                if dino_res["status"] == "successful":
+                    active_result = dino_res
+                    active_backend = "DINOv2 Base Vision Transformer (Fallback)"
 
         inference_status = active_result["status"]
         inference_status_reason = active_result["status_reason"]
 
         if inference_status == "successful":
-            matched_cat = active_result["matched_category"]
-            raw_scores = {k: 0.05 for k in SUPPORTED_CONDITIONS}
-            raw_scores[matched_cat] = 0.70
+            matched_cat = active_result.get("matched_category")
+            predictions = active_result.get("predictions", [])
+            
+            pattern_scores = {}
+            # Extract genuine predictions from model
+            if predictions and isinstance(predictions, list):
+                for p in predictions:
+                    label = p.get("label", "")
+                    score = round(float(p.get("score", 0.0)), 4)
+                    cat = p.get("category_id") or self._map_hf_label_to_category(label)
+                    if cat and cat in SUPPORTED_CONDITIONS:
+                        pattern_scores[cat] = max(pattern_scores.get(cat, 0.0), score)
 
-            # Distribute remaining heuristic weight evenly
-            remaining = (1.0 - 0.70) / (len(raw_scores) - 1)
-            for k in raw_scores:
-                if k != matched_cat:
-                    raw_scores[k] = remaining
+            # Ensure the primary matched category is preserved with its true score
+            if matched_cat and matched_cat in SUPPORTED_CONDITIONS:
+                if matched_cat not in pattern_scores or pattern_scores[matched_cat] == 0.0:
+                    top_score = round(float(active_result.get("top_score", 0.50)), 4)
+                    pattern_scores[matched_cat] = top_score
 
-            pattern_scores = {k: round(v, 4) for k, v in raw_scores.items()}
-            sorted_predictions = sorted(pattern_scores.items(), key=lambda x: x[1], reverse=True)
-            top1_score = sorted_predictions[0][1]
-            top2_score = sorted_predictions[1][1]
+            # Build sorted predictions from genuine model scores
+            if pattern_scores:
+                sorted_predictions = sorted(pattern_scores.items(), key=lambda x: x[1], reverse=True)
+            elif predictions:
+                sorted_predictions = [
+                    (p.get("label", "Unknown"), round(float(p.get("score", 0.0)), 4))
+                    for p in predictions[:5]
+                ]
+            else:
+                top_score = round(float(active_result.get("top_score", 0.50)), 4)
+                sorted_predictions = [(matched_cat, top_score)]
+
+            top1_score = sorted_predictions[0][1] if sorted_predictions else 0.50
+            top2_score = sorted_predictions[1][1] if len(sorted_predictions) > 1 else 0.0
             margin = round(top1_score - top2_score, 3)
-            normalized_entropy = 0.52
+
+            # Calculate normalized Shannon entropy over non-zero predictions
+            non_zero_scores = [v for v in pattern_scores.values() if v > 0]
+            if len(non_zero_scores) > 1 and sum(non_zero_scores) > 0:
+                total_sum = sum(non_zero_scores)
+                norm_probs = [v / total_sum for v in non_zero_scores]
+                entropy = -sum(p * math.log2(p) for p in norm_probs if p > 0)
+                max_entropy = math.log2(len(non_zero_scores))
+                normalized_entropy = round(min(1.0, max(0.0, entropy / max_entropy)), 3)
+            else:
+                normalized_entropy = 0.35
+
             is_ood = False
             uncertainty_level = active_result.get("confidence_assessment", "Moderate")
             uncertainty_rationale = active_result.get(
                 "uncertainty_rationale",
-                "Automated visual pattern observation. Uncalibrated heuristic score. Medical evaluation required for clinical diagnosis."
+                "Automated visual pattern observation. Uncalibrated model score. Medical evaluation required for clinical diagnosis."
             )
             is_inconclusive = False
             calibrated_probs = pattern_scores
 
-            # Bounding box
+            # Bounding box & localized area
+            bbox_candidate = active_result.get("bounding_box") or (
+                supplementary_gemini.get("bounding_box") if supplementary_gemini else None
+            )
             detected_area: Dict[str, Any] = {
                 "has_detection": False,
                 "bounding_box": None,
                 "label": active_result.get("primary_concern"),
-                "is_supported": active_result.get("bounding_box") is not None,
-                "notes": "Diffuse pattern observed; no single localized lesion isolated."
+                "is_supported": False,
+                "notes": "Localization overlay is not supported by the DINOv2 image classification architecture."
             }
-            if active_result.get("bounding_box"):
-                bbox = active_result["bounding_box"]
-                if isinstance(bbox, dict) and all(k in bbox for k in ("ymin", "xmin", "ymax", "xmax")):
-                    detected_area = {
-                        "has_detection": True,
-                        "bounding_box": {
-                            "ymin": int(bbox["ymin"]),
-                            "xmin": int(bbox["xmin"]),
-                            "ymax": int(bbox["ymax"]),
-                            "xmax": int(bbox["xmax"]),
-                        },
-                        "label": active_result.get("primary_concern", "Observed Area"),
-                        "is_supported": True,
-                        "notes": "Model-identified area of visible observation."
-                    }
+            if bbox_candidate and isinstance(bbox_candidate, dict) and all(k in bbox_candidate for k in ("ymin", "xmin", "ymax", "xmax")):
+                detected_area = {
+                    "has_detection": True,
+                    "bounding_box": {
+                        "ymin": int(bbox_candidate["ymin"]),
+                        "xmin": int(bbox_candidate["xmin"]),
+                        "ymax": int(bbox_candidate["ymax"]),
+                        "xmax": int(bbox_candidate["xmax"]),
+                    },
+                    "label": active_result.get("primary_concern", "Observed Area"),
+                    "is_supported": True,
+                    "notes": "Model-identified area of visible observation."
+                }
+            
+            # Aggregate AI observations
+            observations = list(active_result.get("observed_patterns", []))
+            if supplementary_gemini and supplementary_gemini.get("observed_patterns"):
+                for obs in supplementary_gemini["observed_patterns"]:
+                    if obs not in observations:
+                        observations.append(obs)
         else:
             # Inference is unavailable, inconclusive, or failed.
             # Do NOT fabricate uniform category scores or fake condition predictions!
@@ -676,6 +780,7 @@ Respond strictly with valid JSON conforming to this schema:
             is_ood = True
             uncertainty_level = "Inconclusive"
             uncertainty_rationale = inference_status_reason
+            observations = []
 
             detected_area = {
                 "has_detection": False,
@@ -700,8 +805,8 @@ Respond strictly with valid JSON conforming to this schema:
             "clinical_disclaimer": "Heuristic pattern similarity score only; not a clinically calibrated probability.",
             "top_predictions": sorted_predictions,
             "detected_area": detected_area,
-            "ai_observations": active_result.get("observed_patterns", []) if active_result else [],
-            "gemini_inference": active_result,
+            "ai_observations": observations,
+            "gemini_inference": supplementary_gemini or active_result,
             "uncertainty_metrics": {
                 "normalized_entropy": normalized_entropy,
                 "confidence_margin": margin,

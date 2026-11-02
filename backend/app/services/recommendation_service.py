@@ -230,46 +230,34 @@ class RecommendationEngine:
 
         matches: List[ConditionMatchModel] = []
 
-        # 1. Eczema / Contact Irritation
-        eczema_prob = probs.get("eczema_contact_dermatitis", 0.05)
-        if symptoms.prior_chemical_exposure:
-            eczema_prob += 0.20
-        if symptoms.itch_score >= 6:
-            eczema_prob += 0.15
+        # Genuine model scores (start from 0.0, never fabricate 0.05 baseline)
+        eczema_prob = probs.get("eczema_contact_dermatitis", 0.0)
+        dysplasia_prob = probs.get("suspicious_dysplastic_lesion", 0.0)
+        benign_prob = probs.get("benign_melanocytic_macule", 0.0)
+        psoriasis_prob = probs.get("psoriasis", 0.0)
+        fungal_prob = probs.get("fungal_tinea", 0.0)
+        acne_prob = probs.get("acne_vulgaris", 0.0)
 
-        # 2. Dysplasia / Atypical Lesion
-        dysplasia_prob = probs.get("suspicious_dysplastic_lesion", 0.05)
-        if symptoms.bleeding_or_crusting:
-            dysplasia_prob += 0.20
-        if symptoms.is_spreading and symptoms.duration_days > 30:
-            dysplasia_prob += 0.15
-
-        # 3. Common Mole / Macule
-        benign_prob = probs.get("benign_melanocytic_macule", 0.05)
-
-        # 4. Scaly Plaque / Psoriasis pattern
-        psoriasis_prob = probs.get("psoriasis", 0.05)
-        if "psoriasis" in (symptoms.personal_skin_history or "").lower():
-            psoriasis_prob += 0.25
-
-        # 5. Ring-shaped / Fungal pattern
-        fungal_prob = probs.get("fungal_tinea", 0.05)
-        if symptoms.itch_score >= 4 and not symptoms.prior_chemical_exposure:
-            fungal_prob += 0.10
-
-        # 6. Acne / Blemishes
-        acne_prob = probs.get("acne_vulgaris", 0.05)
-        if "face" in symptoms.anatomical_region.lower() or "chest" in symptoms.anatomical_region.lower():
-            acne_prob += 0.15
+        # Subtle symptom-concordance adjustments (max +0.10) to reflect patient clinical context
+        if symptoms.prior_chemical_exposure and eczema_prob > 0:
+            eczema_prob += 0.05
+        if symptoms.bleeding_or_crusting and dysplasia_prob > 0:
+            dysplasia_prob += 0.08
+        if "psoriasis" in (symptoms.personal_skin_history or "").lower() and psoriasis_prob > 0:
+            psoriasis_prob += 0.05
+        if symptoms.itch_score >= 5 and fungal_prob > 0:
+            fungal_prob += 0.03
 
         weighted = [
-            ("eczema_contact_dermatitis", eczema_prob),
-            ("suspicious_dysplastic_lesion", dysplasia_prob),
-            ("benign_melanocytic_macule", benign_prob),
-            ("psoriasis", psoriasis_prob),
-            ("fungal_tinea", fungal_prob),
-            ("acne_vulgaris", acne_prob),
+            ("eczema_contact_dermatitis", round(eczema_prob, 4)),
+            ("suspicious_dysplastic_lesion", round(dysplasia_prob, 4)),
+            ("benign_melanocytic_macule", round(benign_prob, 4)),
+            ("psoriasis", round(psoriasis_prob, 4)),
+            ("fungal_tinea", round(fungal_prob, 4)),
+            ("acne_vulgaris", round(acne_prob, 4)),
         ]
+        # Filter out conditions with 0 score, unless it was the matched category
+        weighted = [w for w in weighted if w[1] > 0.0 or w[0] == matched_cat]
         weighted.sort(key=lambda x: x[1], reverse=True)
 
         for rank, (cond_key, score) in enumerate(weighted[:3]):
@@ -586,6 +574,15 @@ class RecommendationEngine:
             citations=citations,
             main_finding=main_finding,
             confidence_statement=confidence_statement,
+            ai_observations=visual_findings.get("ai_observations", []),
+            model_metadata={
+                "model_version": visual_findings.get("model_version"),
+                "backend": visual_findings.get("backend"),
+                "is_uncalibrated_heuristic": visual_findings.get("is_uncalibrated_heuristic", True),
+                "is_clinical_probability": visual_findings.get("is_clinical_probability", False),
+                "clinical_disclaimer": visual_findings.get("clinical_disclaimer"),
+                "uncertainty_metrics": visual_findings.get("uncertainty_metrics", {})
+            },
             cosmetic_skin_type=cosmetic_skin_type,
             detected_area=detected_area,
             recommended_skincare=recommended_skincare,

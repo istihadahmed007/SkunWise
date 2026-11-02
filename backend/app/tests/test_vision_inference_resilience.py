@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 import httpx
 
+from app.core.config import settings
 from app.services.vision_engine import VisionModelAdapter, vision_engine
 from app.services.recommendation_service import recommendation_engine
 from app.services.triage_service import triage_service
@@ -24,6 +25,14 @@ def sample_symptoms():
         consent_biometric=True,
         consent_disclaimer=True
     )
+
+
+@pytest.fixture(autouse=True)
+def configure_gemini_test_mode():
+    """Ensure resilience tests target Gemini provider directly without DINOv2 fallback masking errors."""
+    with patch.object(settings, "PRIMARY_AI_PROVIDER", "gemini"), \
+         patch.object(settings, "ENABLE_HUGGINGFACE_FALLBACK", False):
+        yield
 
 
 def test_missing_api_key_returns_explicitly_unavailable():

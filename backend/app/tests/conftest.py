@@ -4,12 +4,24 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.database import Base, get_db
 from app.core.config import settings
+from app.core.rate_limiter import auth_rate_limiter, register_rate_limiter, analyze_rate_limiter
 from app.main import app
 
 # In-memory SQLite for testing
 TEST_DATABASE_URL = "sqlite:///:memory:"
 test_engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiters():
+    """Reset security rate limiters before and after each test to avoid cross-test throttling."""
+    auth_rate_limiter.reset()
+    register_rate_limiter.reset()
+    analyze_rate_limiter.reset()
+    yield
+    auth_rate_limiter.reset()
+    register_rate_limiter.reset()
+    analyze_rate_limiter.reset()
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():

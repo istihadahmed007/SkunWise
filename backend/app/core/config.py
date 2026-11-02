@@ -59,8 +59,8 @@ class Settings(BaseSettings):
     MAX_GLARE_RATIO: float = 0.08
     
     # AI Engine Configuration
-    PRIMARY_AI_PROVIDER: str = os.getenv("PRIMARY_AI_PROVIDER", "gemini").lower().strip()
-    ENABLE_HUGGINGFACE_FALLBACK: bool = os.getenv("ENABLE_HUGGINGFACE_FALLBACK", "false").lower() == "true"
+    PRIMARY_AI_PROVIDER: str = os.getenv("PRIMARY_AI_PROVIDER", "dinov2").lower().strip()
+    ENABLE_HUGGINGFACE_FALLBACK: bool = os.getenv("ENABLE_HUGGINGFACE_FALLBACK", "true").lower() == "true"
     AI_MODEL_BACKBONE: str = "gemini-3.5-flash-lite"
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")

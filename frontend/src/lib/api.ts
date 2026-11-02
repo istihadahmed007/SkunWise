@@ -122,6 +122,8 @@ export interface TriageResult {
   }>;
   main_finding?: string;
   confidence_statement?: string;
+  ai_observations?: string[];
+  model_metadata?: Record<string, any>;
   cosmetic_skin_type?: CosmeticSkinType;
   detected_area?: DetectedArea;
   recommended_skincare?: SkincareProductOption[];

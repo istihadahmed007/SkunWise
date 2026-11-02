@@ -322,11 +322,54 @@ export default function AssessmentDetailPage() {
               {triage.rationale}
             </p>
 
+            {/* Visual Observations (What the Model Observed) */}
+            {triage.ai_observations && triage.ai_observations.length > 0 && (
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#2b7f8f] block">
+                  {language === "bn" ? "দৃশ্যমান পর্যবেক্ষণসমূহ" : "Visual Observations"}
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {triage.ai_observations.map((obs, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2.5 py-1 rounded-lg bg-[#f0f8fb] text-[#192531] text-xs font-medium border border-[#cce4ee]"
+                    >
+                      {obs}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Alternative Possibilities (Up to two supported classes) */}
+            {triage.possible_conditions && triage.possible_conditions.length > 1 && (
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#4a5d6e] block">
+                  {language === "bn" ? "বিকল্প সম্ভাব্য প্যাটার্নসমূহ" : "Alternative Possibilities Considered"}
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {triage.possible_conditions.slice(1, 3).map((alt, idx) => (
+                    <div key={idx} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                      <div className="font-bold text-[#192531]">{alt.name}</div>
+                      <div className="text-[11px] text-[#718292] mt-0.5">{alt.visual_overlap}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Honest Confidence & Uncertainty Indicator */}
-            <div className="p-4 rounded-2xl bg-[#eaf4f8] border border-[#cce4ee] space-y-1 text-xs">
-              <div className="flex items-center gap-1.5 font-bold text-[#2b7f8f]">
-                <span className="material-symbols-outlined text-base">info</span>
-                <span>{language === "bn" ? "সতর্কতা ও নির্ভুলতার মাত্রা" : "Honest Model Uncertainty Notice"}</span>
+            <div className="p-4 rounded-2xl bg-[#eaf4f8] border border-[#cce4ee] space-y-1.5 text-xs">
+              <div className="flex items-center justify-between flex-wrap gap-2 font-bold text-[#2b7f8f]">
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">info</span>
+                  <span>{language === "bn" ? "মডেল বিশ্লেষণ ও নির্ভরযোগ্যতা" : "Model Confidence & Limitations"}</span>
+                </div>
+                {triage.model_metadata?.backend && (
+                  <span className="text-[10px] bg-white px-2 py-0.5 rounded-md border border-[#cce4ee] text-[#4a5d6e]">
+                    {triage.model_metadata.backend}
+                  </span>
+                )}
               </div>
               <p className="text-[#4a5d6e] leading-relaxed">
                 {triage.confidence_statement ||
@@ -334,6 +377,11 @@ export default function AssessmentDetailPage() {
                     ? "এটি শুধুমাত্র কম্পিউটার ভিশন প্যাটার্ন সাদৃশ্য। ফোনের ছবি ত্বকের গভীরতা বা তাপমাত্রা বুঝতে পারে না। নিশ্চিত রোগ নির্ণয়ের জন্য চিকিৎসকের পরীক্ষা আবশ্যক।"
                     : "This visual pattern match is informational only. Phone photographs cannot replace physical palpation and clinical medical evaluation.")}
               </p>
+              <div className="pt-1 flex items-center gap-3 text-[11px] text-[#718292]">
+                <span>Focus: {assessment.quality_metrics.sharpness_status}</span>
+                <span>•</span>
+                <span>Lighting: {assessment.quality_metrics.lighting_status}</span>
+              </div>
             </div>
           </div>
         </div>

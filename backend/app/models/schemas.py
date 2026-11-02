@@ -241,6 +241,8 @@ class TriageResultModel(BaseModel):
     # Redesigned 4-Section Fields
     main_finding: Optional[str] = None
     confidence_statement: Optional[str] = None
+    ai_observations: List[str] = Field(default_factory=list)
+    model_metadata: Optional[Dict[str, Any]] = None
     cosmetic_skin_type: Optional[CosmeticSkinTypeModel] = None
     detected_area: Optional[DetectedAreaModel] = None
     recommended_skincare: List[SkincareProductOptionModel] = Field(default_factory=list)

@@ -10,6 +10,7 @@ def save_private_image(clean_bytes: bytes, file_ext: str = "jpg") -> str:
     Saves sanitized image bytes to private storage directory.
     Returns the secure stored filename (not a public URL).
     """
+    settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"lesion_{uuid.uuid4().hex}.{file_ext}"
     filepath = settings.UPLOAD_DIR / filename
     

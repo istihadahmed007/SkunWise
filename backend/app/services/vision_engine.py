@@ -154,13 +154,13 @@ class SkinRegionDetector:
         cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b
         cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b
 
-        ycbcr_mask = (y > 15) & (cb >= 68) & (cb <= 145) & (cr >= 120) & (cr <= 188)
+        ycbcr_mask = (y > 10) & (cb >= 65) & (cb <= 150) & (cr >= 115) & (cr <= 190)
 
         # 2. Normalized RGB space (Kovac / Peer chromaticity locus across light and dark tones)
         sum_rgb = r + g + b + 1e-5
         r_norm = r / sum_rgb
         g_norm = g / sum_rgb
-        norm_rgb_mask = (r_norm > 0.33) & (g_norm >= 0.20) & (g_norm <= 0.38) & (r >= g) & ((r - g) >= 3)
+        norm_rgb_mask = (r_norm > 0.30) & (g_norm >= 0.18) & (g_norm <= 0.42) & (r >= b - 5)
 
         # 3. HSV rule for melanin and light tones, plus red erythema wrapping around 360 degrees
         max_c = np.maximum(np.maximum(r, g), b)
@@ -179,9 +179,9 @@ class SkinRegionDetector:
         s = delta / (max_c + 1e-5)
         v = max_c / 255.0
 
-        hsv_mask = ((h <= 55) | (h >= 330)) & (s >= 0.08) & (s <= 0.88) & (v >= 0.08)
+        hsv_mask = ((h <= 65) | (h >= 320)) & (s >= 0.04) & (s <= 0.95) & (v >= 0.05)
 
-        combined_mask = (ycbcr_mask | norm_rgb_mask) & (hsv_mask | norm_rgb_mask)
+        combined_mask = (ycbcr_mask | norm_rgb_mask) & (hsv_mask | norm_rgb_mask) & (r > 20)
         return combined_mask
 
     @classmethod
@@ -191,8 +191,8 @@ class SkinRegionDetector:
         total_pixels = int(combined_mask.size)
         coverage_ratio = round(skin_pixel_count / max(1, total_pixels), 3)
 
-        # Minimum 8% skin coverage required to consider photo a valid dermatological intake
-        is_skin = coverage_ratio >= 0.08
+        # Minimum 4% skin coverage required to consider photo a valid dermatological intake
+        is_skin = coverage_ratio >= 0.04
 
         return is_skin, coverage_ratio, {
             "skin_coverage_ratio": coverage_ratio,

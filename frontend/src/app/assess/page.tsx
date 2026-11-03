@@ -59,32 +59,8 @@ export default function AssessPage() {
         : "An unexpected error occurred. Please try again.";
     }
     const lower = rawError.toLowerCase();
-    if (lower.includes("consent") || lower.includes("biometric") || lower.includes("disclaimer")) {
-      return language === "bn"
-        ? "এগিয়ে যাওয়ার জন্য অনুগ্রহ করে ছবি প্রক্রিয়াকরণ ও অ-নির্ণয়কারী পরামর্শের স্বীকৃতি উভয়টি নিশ্চিত করুন।"
-        : "Affirmative consent for photo processing and non-diagnostic acknowledgment are required to proceed.";
-    }
-    if (lower.includes("quality") || lower.includes("blur") || lower.includes("dark") || lower.includes("light")) {
-      return language === "bn"
-        ? "ছবির মান পর্যাপ্ত স্পষ্ট নয়। অনুগ্রহ করে পর্যাপ্ত আলোতে ঝাপসা ছাড়া পরিষ্কার ছবি তুলুন।"
-        : "Photo quality was insufficient for visual pattern matching. Please capture a clear, steady photo in natural daylight.";
-    }
-    if (
-      lower.includes("insufficient skin") ||
-      lower.includes("skin pixel") ||
-      lower.includes("skin locus") ||
-      lower.includes("non-skin") ||
-      lower.includes("skin coverage")
-    ) {
-      return language === "bn"
-        ? "ছবিতে পর্যাপ্ত ত্বক শনাক্ত করা যায়নি। অনুগ্রহ করে সরাসরি ত্বকের স্পষ্ট ছবি আপলোড করুন।"
-        : "Insufficient skin area visible in the photo. Please provide a clear, focused image of the skin concern.";
-    }
-    if (lower.includes("validation error") || lower.includes("input_value") || lower.includes("pydantic") || lower.includes("payload")) {
-      return language === "bn"
-        ? "লক্ষণ ও তথ্যের ফর্ম প্রক্রিয়াকরণে সমস্যা হয়েছে। অনুগ্রহ করে তথ্য পুনরায় পরীক্ষা করে চেষ্টা করুন।"
-        : "There was an issue processing your symptom inputs. Please review your answers and try again.";
-    }
+
+    // 1. Connection / Server / Gateway issues
     if (
       lower.includes("timeout") ||
       lower.includes("503") ||
@@ -102,6 +78,56 @@ export default function AssessPage() {
         ? "সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি। অনুগ্রহ করে ব্যাকএন্ড সার্ভার চালু রয়েছে কিনা তা পরীক্ষা করুন।"
         : "Unable to connect to the analysis service. Please ensure the backend server is running and try again.";
     }
+
+    // 2. Patient Intake Consent
+    if (lower.includes("consent") || lower.includes("biometric") || lower.includes("disclaimer")) {
+      return language === "bn"
+        ? "এগিয়ে যাওয়ার জন্য অনুগ্রহ করে ছবি প্রক্রিয়াকরণ ও অ-নির্ণয়কারী পরামর্শের স্বীকৃতি উভয়টি নিশ্চিত করুন।"
+        : "Affirmative consent for photo processing and non-diagnostic acknowledgment are required to proceed.";
+    }
+
+    // 3. Aspect ratio / Dimensions / Format
+    if (lower.includes("aspect ratio") || lower.includes("abnormal")) {
+      return language === "bn"
+        ? "ছবির দৈর্ঘ্য ও প্রস্থের অনুপাত অস্বাভাবিক। অনুগ্রহ করে সাধারণ অনুপাতের সরাসরি ছবি আপলোড করুন।"
+        : "Image aspect ratio is abnormal. Please upload a standard photo centered on the skin concern.";
+    }
+    if (lower.includes("resolution") || lower.includes("too low") || lower.includes("minimum 200")) {
+      return language === "bn"
+        ? "ছবির রেজোলিউশন খুব কম (সর্বনিম্ন ২০০x২০০ পিক্সেল)। স্পষ্ট ও বড় ছবি আপলোড করুন।"
+        : "Image resolution is too low (minimum 200x200px required). Please upload a clearer, closer photo.";
+    }
+    if (lower.includes("format") || lower.includes("magic bytes") || lower.includes("signature") || lower.includes("heic")) {
+      return language === "bn"
+        ? "ছবির ফরম্যাট সমর্থিত নয়। অনুগ্রহ করে সরাসরি JPEG, PNG বা WebP ছবি ব্যবহার করুন।"
+        : "Unsupported image format. Please upload a JPEG, PNG, or WebP photo directly.";
+    }
+
+    // 4. Optical Quality (Blur / Glare / Exposure)
+    if (lower.includes("quality") || lower.includes("blur") || lower.includes("dark") || lower.includes("light")) {
+      return language === "bn"
+        ? "ছবির মান পর্যাপ্ত স্পষ্ট নয়। অনুগ্রহ করে পর্যাপ্ত আলোতে ঝাপসা ছাড়া পরিষ্কার ছবি তুলুন।"
+        : "Photo quality was insufficient for visual pattern matching. Please capture a clear, steady photo in natural daylight.";
+    }
+
+    // 5. Explicit Non-Skin Rejection
+    if (
+      lower.includes("insufficient skin") ||
+      lower.includes("skin pixel") ||
+      lower.includes("non-skin area")
+    ) {
+      return language === "bn"
+        ? "ছবিতে পর্যাপ্ত ত্বক শনাক্ত করা যায়নি। অনুগ্রহ করে সরাসরি ত্বকের স্পষ্ট ছবি আপলোড করুন।"
+        : "Insufficient skin area visible in the photo. Please provide a clear, focused image of the skin concern.";
+    }
+
+    // 6. Form / Symptom Validation
+    if (lower.includes("validation error") || lower.includes("input_value") || lower.includes("pydantic") || lower.includes("payload")) {
+      return language === "bn"
+        ? "লক্ষণ ও তথ্যের ফর্ম প্রক্রিয়াকরণে সমস্যা হয়েছে। অনুগ্রহ করে তথ্য পুনরায় পরীক্ষা করে চেষ্টা করুন।"
+        : "There was an issue processing your symptom inputs. Please review your answers and try again.";
+    }
+
     return rawError;
   };
 

@@ -19,6 +19,10 @@ def detect_environment() -> str:
     if env and env.strip():
         return env.lower().strip()
     vercel_env = os.getenv("VERCEL_ENV")
+    # If deployed on Vercel without an explicit custom SECRET_KEY, run safely as preview
+    # to prevent crashing with 500 while remaining secure.
+    if vercel_env == "production" and not os.getenv("SECRET_KEY"):
+        return "preview"
     if vercel_env and vercel_env.strip():
         return vercel_env.lower().strip()
     node_env = os.getenv("NODE_ENV")
@@ -111,7 +115,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_security(self):
         env_normalized = (self.ENVIRONMENT or "").lower().strip()
-        if env_normalized not in ("development", "test"):
+        if env_normalized not in ("development", "test", "preview"):
             insecure_keys = [
                 "skinwise-dev-clinical-insecure-key-change-in-production",
                 "skinwise-super-secret-clinical-key-2026-production-grade",

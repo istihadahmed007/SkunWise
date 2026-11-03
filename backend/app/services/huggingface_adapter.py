@@ -24,18 +24,30 @@ class HuggingFaceVisionAdapter:
     a clinical diagnosis.
     """
 
-    MODEL_ID = settings.HF_MODEL_ID
-    ROUTER_URL = f"{settings.HF_ROUTER_URL}/{settings.HF_MODEL_ID}"
     REQUEST_TIMEOUT = 15.0
+
+    @property
+    def model_id(self) -> str:
+        return settings.HF_MODEL_ID or "Jayanth2002/dinov2-base-finetuned-SkinDisease"
+
+    @property
+    def router_url(self) -> str:
+        base = (settings.HF_ROUTER_URL or "https://router.huggingface.co/hf-inference/models").rstrip("/")
+        return f"{base}/{self.model_id}"
+
+    @property
+    def fallback_api_url(self) -> str:
+        return f"https://api-inference.huggingface.co/models/{self.model_id}"
 
     def is_configured(self) -> bool:
         """Check if Hugging Face API credentials are set in environment."""
-        return bool(settings.HF_TOKEN and len(settings.HF_TOKEN.strip()) > 5)
+        token = settings.HF_TOKEN
+        return bool(token and len(token.strip()) > 5 and token.strip() != "YOUR_HUGGINGFACE_TOKEN")
 
     def get_model_metadata(self) -> Dict[str, Any]:
         """Return genuine metadata and capabilities of the evaluated model."""
         return {
-            "model_id": self.MODEL_ID,
+            "model_id": self.model_id,
             "provider": "Hugging Face Serverless Inference",
             "architecture": "DINOv2 Base (Vision Transformer)",
             "pipeline": "image-classification",
@@ -43,7 +55,7 @@ class HuggingFaceVisionAdapter:
             "supports_segmentation": False,
             "is_configured": self.is_configured(),
             "target_classes_count": 31,
-            "reference": "https://huggingface.co/Jayanth2002/dinov2-base-finetuned-SkinDisease"
+            "reference": f"https://huggingface.co/{self.model_id}"
         }
 
     def infer(self, image_bytes: bytes) -> Dict[str, Any]:
@@ -56,7 +68,7 @@ class HuggingFaceVisionAdapter:
             return {
                 "success": False,
                 "status": "unconfigured",
-                "model_id": self.MODEL_ID,
+                "model_id": self.model_id,
                 "message": (
                     "Hugging Face credentials (HF_TOKEN or HUGGINGFACE_API_KEY) are not set in the backend environment. "
                     "Inference was not run to avoid fabricating fake results."
@@ -88,14 +100,18 @@ class HuggingFaceVisionAdapter:
             return {
                 "success": False,
                 "status": "invalid_image",
-                "model_id": self.MODEL_ID,
+                "model_id": self.model_id,
                 "message": f"Could not process input image format: {str(e)}",
                 "predictions": []
             }
 
         try:
             with httpx.Client(timeout=self.REQUEST_TIMEOUT) as client:
-                response = client.post(self.ROUTER_URL, headers=headers, content=payload_bytes)
+                response = client.post(self.router_url, headers=headers, content=payload_bytes)
+
+                # Fallback to standard inference API endpoint if router endpoint returns 404
+                if response.status_code == 404:
+                    response = client.post(self.fallback_api_url, headers=headers, content=payload_bytes)
 
                 if response.status_code == 503:
                     # Model is currently loading on Hugging Face infrastructure
@@ -104,17 +120,17 @@ class HuggingFaceVisionAdapter:
                     return {
                         "success": False,
                         "status": "model_loading",
-                        "model_id": self.MODEL_ID,
+                        "model_id": self.model_id,
                         "estimated_wait_seconds": estimated_time,
-                        "message": f"Hugging Face model {self.MODEL_ID} is currently warming up on serverless infrastructure. Please retry in ~{int(estimated_time)}s.",
+                        "message": f"Hugging Face model {self.model_id} is currently warming up on serverless infrastructure. Please retry in ~{int(estimated_time)}s.",
                         "predictions": []
                     }
 
-                if response.status_code == 401 or response.status_code == 403:
+                if response.status_code in (401, 403):
                     return {
                         "success": False,
                         "status": "unauthorized",
-                        "model_id": self.MODEL_ID,
+                        "model_id": self.model_id,
                         "message": "Invalid or expired Hugging Face API token. Please check HF_TOKEN in backend environment variables.",
                         "predictions": []
                     }
@@ -127,7 +143,7 @@ class HuggingFaceVisionAdapter:
                     return {
                         "success": False,
                         "status": "unexpected_format",
-                        "model_id": self.MODEL_ID,
+                        "model_id": self.model_id,
                         "message": f"Unexpected response structure from Hugging Face model: {raw_preds}",
                         "predictions": []
                     }
@@ -138,7 +154,7 @@ class HuggingFaceVisionAdapter:
                 return {
                     "success": True,
                     "status": "completed",
-                    "model_id": self.MODEL_ID,
+                    "model_id": self.model_id,
                     "predictions": sorted_preds[:5],
                     "top_label": sorted_preds[0].get("label") if sorted_preds else None,
                     "top_score": sorted_preds[0].get("score") if sorted_preds else 0.0,
@@ -158,7 +174,7 @@ class HuggingFaceVisionAdapter:
             return {
                 "success": False,
                 "status": "timeout",
-                "model_id": self.MODEL_ID,
+                "model_id": self.model_id,
                 "message": f"Hugging Face inference timed out after {self.REQUEST_TIMEOUT}s.",
                 "predictions": []
             }
@@ -166,7 +182,7 @@ class HuggingFaceVisionAdapter:
             return {
                 "success": False,
                 "status": "error",
-                "model_id": self.MODEL_ID,
+                "model_id": self.model_id,
                 "message": f"Hugging Face adapter communication error: {str(err)}",
                 "predictions": []
             }

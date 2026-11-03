@@ -11,11 +11,11 @@ import numpy as np
 import httpx
 from app.core.config import settings
 from app.services.huggingface_adapter import huggingface_adapter
-from app.services.dinov2_classifier import dinov2_classifier
+from app.services.dinov2_classifier import dinov2_classifier, get_dinov2_class_metadata
 
 logger = logging.getLogger(__name__)
 
-# Supported visual pattern families
+# Supported visual pattern families - includes all 31 DINOv2 classes plus clinical patterns
 SUPPORTED_CONDITIONS = {
     "eczema_contact_dermatitis": {
         "id": "eczema_contact_dermatitis",
@@ -58,6 +58,76 @@ SUPPORTED_CONDITIONS = {
         "category": "Pigmented Lesion Requiring In-Person Check",
         "typical_features": ["asymmetry", "border irregularity", "color variegation", "diameter > 6mm"],
         "base_concordance": "Flagged when boundaries exhibit marked asymmetry or multiple colors"
+    },
+    "herpes_simplex": {
+        "id": "herpes_simplex",
+        "name": "Herpes Simplex (Viral Blister Pattern)",
+        "category": "Cutaneous Viral Infection",
+        "typical_features": ["grouped vesicles", "burning sensation", "erythematous base"],
+        "base_concordance": "High in perioral, mucosal, or localized epidermal areas"
+    },
+    "impetigo": {
+        "id": "impetigo",
+        "name": "Impetigo (Bacterial Crusting Pattern)",
+        "category": "Cutaneous Bacterial Infection",
+        "typical_features": ["honey-colored crusting", "superficial erosions", "fragile bullae"],
+        "base_concordance": "High in facial, perinasal, or exposed extremity regions"
+    },
+    "lichen_planus": {
+        "id": "lichen_planus",
+        "name": "Lichen Planus (Violaceous Papule Pattern)",
+        "category": "Inflammatory Papulosquamous Dermatosis",
+        "typical_features": ["pruritic violaceous polygonal flat-topped papules", "Wickham striae"],
+        "base_concordance": "High on flexor wrists, ankles, and lumbar region"
+    },
+    "molluscum_contagiosum": {
+        "id": "molluscum_contagiosum",
+        "name": "Molluscum Contagiosum (Viral Papule Pattern)",
+        "category": "Cutaneous Viral Infection",
+        "typical_features": ["firm dome-shaped papules", "central umbilication", "pearly surface"],
+        "base_concordance": "High in pediatric and intertriginous flexural distributions"
+    },
+    "pityriasis_rosea": {
+        "id": "pityriasis_rosea",
+        "name": "Pityriasis Rosea (Herald Patch Pattern)",
+        "category": "Acute Exanthematous Dermatosis",
+        "typical_features": ["herald patch", "collarette of scale", "Christmas tree distribution"],
+        "base_concordance": "High along Langer's cleavage lines on trunk"
+    },
+    "pediculosis_capitis": {
+        "id": "pediculosis_capitis",
+        "name": "Pediculosis Capitis (Head Lice Infestation)",
+        "category": "Parasitic Ectoparasitosis",
+        "typical_features": ["excoriation marks", "nits on hair shafts", "scalp pruritus"],
+        "base_concordance": "High in scalp and retroauricular regions"
+    },
+    "larva_migrans": {
+        "id": "larva_migrans",
+        "name": "Cutaneous Larva Migrans (Parasitic Track Pattern)",
+        "category": "Parasitic Cutaneous Infestation",
+        "typical_features": ["serpiginous erythematous linear track", "intense itching"],
+        "base_concordance": "High on feet, buttocks, or extremities following sand/soil exposure"
+    },
+    "tungiasis": {
+        "id": "tungiasis",
+        "name": "Tungiasis (Flea Ectoparasitosis Pattern)",
+        "category": "Parasitic Ectoparasitosis",
+        "typical_features": ["punctiform nodule with central black dot", "periungual papule"],
+        "base_concordance": "High on plantar foot, periungual margins"
+    },
+    "papilomatosis_confluentes": {
+        "id": "papilomatosis_confluentes",
+        "name": "Confluent and Reticulated Papillomatosis Pattern",
+        "category": "Rare Reticulated Dermatosis",
+        "typical_features": ["reticulated brown macules", "central confluent plaques"],
+        "base_concordance": "High on interscapular and epigastric trunk"
+    },
+    "unsupported_specialized_condition": {
+        "id": "unsupported_specialized_condition",
+        "name": "Specialized Dermatosis (Doctor Evaluation Required)",
+        "category": "Specialized Medical Dermatosis",
+        "typical_features": ["complex morphological pattern", "systemic/genetic features"],
+        "base_concordance": "Requires in-person clinical examination and diagnostic testing"
     }
 }
 
@@ -133,19 +203,31 @@ class VisionModelAdapter:
     7. Transparent reporting: Never invents fake models, weights, or diagnosis.
     """
 
-    def __init__(self, model_name: str = "SkinWise-Multimodal-Vision-v4.2"):
+    def __init__(self, model_name: str = "SkinWise-Multimodal-Vision-v4.2", primary_provider: Optional[str] = None):
         self.model_name = model_name
         self.version = "4.2.1-derm-triage"
-        self.api_key = os.environ.get("GEMINI_API_KEY", "")
+        # Consistently read from settings.GEMINI_API_KEY with environment fallback
+        raw_key = getattr(settings, "GEMINI_API_KEY", "") or os.environ.get("GEMINI_API_KEY", "")
+        self.api_key: Optional[str] = "" if raw_key == "YOUR_GEMINI_API_KEY" else (raw_key.strip() if raw_key else None)
+        self.primary_provider = primary_provider
         self.is_loaded = True
         self.backend_type = (
             "Gemini-3.5-Flash Multimodal Vision Engine"
-            if self.api_key
-            else "Morphological Feature Analyzer (Rule-Based Triage)"
+            if self.is_configured()
+            else "DINOv2 Base Vision Transformer (Jayanth2002/dinov2-base-finetuned-SkinDisease)"
         )
 
     def is_configured(self) -> bool:
-        return bool(self.api_key and len(self.api_key.strip()) > 5)
+        key = self.api_key if getattr(self, "api_key", None) is not None else (getattr(settings, "GEMINI_API_KEY", "") or os.environ.get("GEMINI_API_KEY", ""))
+        if key == "YOUR_GEMINI_API_KEY":
+            return False
+        return bool(key and len(key.strip()) > 5)
+
+    def _get_api_key(self) -> str:
+        key = self.api_key if getattr(self, "api_key", None) is not None else (getattr(settings, "GEMINI_API_KEY", "") or os.environ.get("GEMINI_API_KEY", ""))
+        if key == "YOUR_GEMINI_API_KEY":
+            return ""
+        return key.strip()
 
     def health_check(self) -> Dict[str, Any]:
         return {
@@ -232,9 +314,13 @@ class VisionModelAdapter:
 
     @staticmethod
     def _map_hf_label_to_category(label: Optional[str]) -> Optional[str]:
-        """Maps Hugging Face DINOv2 labels to unified triage categories."""
+        """Maps Hugging Face DINOv2 labels to unified triage categories using 31-class metadata."""
         if not label:
             return None
+        meta = get_dinov2_class_metadata(label)
+        category_id = meta.get("category_id")
+        if category_id and category_id in SUPPORTED_CONDITIONS:
+            return category_id
         l = label.lower()
         if any(term in l for term in ("acne", "comedone", "pimple", "folliculitis")):
             return "acne_vulgaris"
@@ -248,7 +334,7 @@ class VisionModelAdapter:
             return "suspicious_dysplastic_lesion"
         if any(term in l for term in ("nevus", "mole", "freckle", "lentigo", "macule", "melanocytic", "seborrheic keratosis")):
             return "benign_melanocytic_macule"
-        return None
+        return category_id or "unsupported_specialized_condition"
 
     def _infer_with_dinov2(self, image_bytes: bytes) -> Dict[str, Any]:
         """
@@ -346,11 +432,13 @@ class VisionModelAdapter:
             if matched_cat and top_score >= 0.20:
                 logger.info("Hugging Face DINOv2 matched category: %s (label: %s, score: %.2f)", matched_cat, top_label, top_score)
                 conf = "High" if top_score > 0.65 else "Moderate" if top_score > 0.35 else "Low"
+                meta = get_dinov2_class_metadata(top_label)
+                display_name = meta.get("display_name") or (SUPPORTED_CONDITIONS.get(matched_cat, {}).get("name") if matched_cat in SUPPORTED_CONDITIONS else top_label)
                 return {
                     "status": "successful",
                     "status_reason": f"Visual pattern matched via Hugging Face DINOv2 model ({top_label}).",
                     "matched_category": matched_cat,
-                    "primary_concern": SUPPORTED_CONDITIONS[matched_cat]["name"],
+                    "primary_concern": display_name,
                     "observed_patterns": [f"DINOv2 classification: {p.get('label')} ({round(p.get('score', 0.0) * 100, 1)}%)" for p in hf_res.get("predictions", [])],
                     "bounding_box": None,
                     "confidence_assessment": conf,
@@ -449,8 +537,9 @@ Respond strictly with valid JSON conforming to this schema:
                 }
             }
 
-            model_name = os.getenv("GEMINI_MODEL", getattr(settings, "AI_MODEL_BACKBONE", "gemini-1.5-flash"))
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
+            model_name = getattr(settings, "GEMINI_MODEL", None) or os.getenv("GEMINI_MODEL", getattr(settings, "AI_MODEL_BACKBONE", "gemini-1.5-flash"))
+            api_key = self._get_api_key()
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
             response = httpx.post(url, json=payload, timeout=20.0)
 
             if response.status_code != 200:

@@ -121,6 +121,41 @@ class SafetyTriageService:
                 )
             }
 
+        # Check if matched visual category requires clinician evaluation (infections, complex dermatoses)
+        matched_cat = None
+        gemini_inf = visual_findings.get("gemini_inference")
+        if gemini_inf and isinstance(gemini_inf, dict):
+            matched_cat = gemini_inf.get("matched_category")
+        if not matched_cat:
+            calibrated_probs = visual_findings.get("observed_pattern_scores") or visual_findings.get("calibrated_probabilities", {})
+            if calibrated_probs:
+                matched_cat = max(calibrated_probs.items(), key=lambda x: x[1])[0]
+
+        if is_visual_successful and matched_cat in (
+            "herpes_simplex",
+            "impetigo",
+            "unsupported_specialized_condition",
+            "pediculosis_capitis",
+            "larva_migrans",
+            "tungiasis",
+        ):
+            if matched_cat == "unsupported_specialized_condition":
+                reason = "Visual observation suggests a complex, specialized, or systemic dermatosis that cannot be evaluated by automated software. An in-person consultation with a qualified dermatologist is recommended."
+            elif matched_cat in ("herpes_simplex", "impetigo"):
+                reason = "Visual pattern indicates possible cutaneous infection (viral blistering or bacterial crusting). An in-person medical evaluation is recommended for diagnostic confirmation and prescription medical therapy."
+            else:
+                reason = "Visual pattern is consistent with an ectoparasitic or cutaneous infestation requiring clinical medical evaluation and targeted anti-parasitic treatment."
+
+            return {
+                "triage_tier": 2,
+                "triage_name": "Doctor Check Recommended",
+                "recommended_timeline": "Within 1 to 2 Weeks",
+                "urgency_badge_color": "amber",
+                "emergency_warning_detected": False,
+                "emergency_warning_items": [],
+                "rationale": reason
+            }
+
         if is_chronic_or_expanding or is_high_symptom_load:
             return {
                 "triage_tier": 2,

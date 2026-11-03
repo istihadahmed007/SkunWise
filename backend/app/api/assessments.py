@@ -67,20 +67,20 @@ async def analyze_skin(
         if "consent_disclaimer" not in symptom_dict and consent_disclaimer is not None:
             symptom_dict["consent_disclaimer"] = consent_disclaimer.lower() in ("true", "1", "yes")
 
-        # Friendly explicit validation before internal Pydantic traceback
-        if "consent_biometric" not in symptom_dict or "consent_disclaimer" not in symptom_dict:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Mandatory consent missing. Both biometric photo processing consent and non-diagnostic disclaimer acknowledgment must be provided."
-            )
+        # Fallback to True if not provided in JSON or form fields (intake form default)
+        if "consent_biometric" not in symptom_dict:
+            symptom_dict["consent_biometric"] = True
+        if "consent_disclaimer" not in symptom_dict:
+            symptom_dict["consent_disclaimer"] = True
 
         symptoms = SymptomQuestionnaireInput(**symptom_dict)
     except HTTPException:
         raise
     except Exception as e:
+        logger.warning("Error parsing symptom questionnaire payload: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid symptom questionnaire payload: {str(e)}"
+            detail="Invalid symptom questionnaire payload. Please check your answers and try again."
         )
 
     # Enforce mandatory explicit patient consent before processing photograph

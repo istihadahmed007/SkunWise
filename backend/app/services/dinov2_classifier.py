@@ -43,101 +43,371 @@ DINOV2_CLASSES: Dict[int, str] = {
     30: "vascular lesion"
 }
 
-# Track A: Common Inflammatory & Infectious Conditions
-TRACK_A_CLASSES = {
-    "Psoriasis",
-    "Tinea Corporis",
-    "Tinea Nigra",
-    "Herpes Simplex",
-    "Impetigo",
-    "Lichen Planus",
-    "Pityriasis Rosea",
-    "Molluscum Contagiosum",
-    "Darier_s Disease",
-    "Hailey-Hailey Disease",
-    "Epidermolysis Bullosa Pruriginosa",
-    "Larva Migrans",
-    "Leprosy Borderline",
-    "Leprosy Lepromatous",
-    "Leprosy Tuberculoid",
-    "Lupus Erythematosus Chronicus Discoides",
-    "Pediculosis Capitis",
-    "Papilomatosis Confluentes And Reticulate",
-    "Tungiasis"
+# Explicit clinical mapping for each of the 31 DINOv2 classes.
+# Preserves original model outputs without forcing unrelated conditions into eczema.
+DINOV2_CLASS_METADATA: Dict[str, Dict[str, Any]] = {
+    # 1. Infections & Infestations (Track A)
+    "Herpes Simplex": {
+        "category_id": "herpes_simplex",
+        "display_name": "Herpes Simplex (Viral Blister Pattern)",
+        "track": "Track A: Cutaneous Viral Infection",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Visual features show localized clustered vesicles or erosion characteristic of herpes simplex virus. An in-person clinical check is advised for targeted antiviral therapy; avoid applying steroid creams."
+    },
+    "Impetigo": {
+        "category_id": "impetigo",
+        "display_name": "Impetigo (Bacterial Crusting Pattern)",
+        "track": "Track A: Cutaneous Bacterial Infection",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Visual characteristics suggest superficial bacterial honey-colored crusting or vesicles. Medical evaluation is recommended for antibiotic assessment and infection control."
+    },
+    "Molluscum Contagiosum": {
+        "category_id": "molluscum_contagiosum",
+        "display_name": "Molluscum Contagiosum (Viral Papule Pattern)",
+        "track": "Track A: Cutaneous Viral Infection",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Visual observation indicates small, firm, umbilicated papules consistent with molluscum contagiosum virus. A clinician can confirm and advise on management."
+    },
+    "Pediculosis Capitis": {
+        "category_id": "pediculosis_capitis",
+        "display_name": "Pediculosis Capitis (Head Lice Infestation)",
+        "track": "Track A: Parasitic Ectoparasitosis",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Pattern features correlate with pediculosis infestation. Healthcare guidance for safe pediculicide treatment and contact hygiene is recommended."
+    },
+    "Larva Migrans": {
+        "category_id": "larva_migrans",
+        "display_name": "Cutaneous Larva Migrans (Parasitic Track Pattern)",
+        "track": "Track A: Cutaneous Parasitic Infestation",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Serpiginous cutaneous migration patterns suggest cutaneous larva migrans. Requires in-person medical evaluation for appropriate antihelminthic therapy."
+    },
+    "Tungiasis": {
+        "category_id": "tungiasis",
+        "display_name": "Tungiasis (Flea Ectoparasitosis Pattern)",
+        "track": "Track A: Parasitic Ectoparasitosis",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Pattern consistent with sand flea burrowing. In-person medical examination is necessary for sterile extraction and tetanus prophylaxis."
+    },
+
+    # 2. Superficial Fungal Mycoses (Track A)
+    "Tinea Corporis": {
+        "category_id": "fungal_tinea",
+        "display_name": "Tinea Corporis (Fungal / Superficial Ringworm Pattern)",
+        "track": "Track A: Superficial Fungal Mycoses",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Annular, scaly active borders observed consistent with dermatophytosis. A doctor can prescribe targeted antifungal medication."
+    },
+    "Tinea Nigra": {
+        "category_id": "fungal_tinea",
+        "display_name": "Tinea Nigra (Superficial Fungal Macule Pattern)",
+        "track": "Track A: Superficial Fungal Mycoses",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Dematiaceous fungal pigmentation observed. Clinical examination recommended to confirm fungal etiology and rule out melanocytic lesions."
+    },
+
+    # 3. Inflammatory & Papulosquamous Dermatoses (Track A)
+    "Psoriasis": {
+        "category_id": "psoriasis",
+        "display_name": "Psoriasis (Scaly Plaque Pattern)",
+        "track": "Track A: Common Papulosquamous Dermatoses",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Erythematous plaques with distinctive micaceous silvery scale. Consultation with a doctor or dermatologist is recommended for tailored management."
+    },
+    "Lichen Planus": {
+        "category_id": "lichen_planus",
+        "display_name": "Lichen Planus (Violaceous Papule Pattern)",
+        "track": "Track A: Inflammatory Papulosquamous Dermatoses",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Violaceous polygonal flat-topped papules observed. An in-person dermatological evaluation is recommended to evaluate mucous membranes and systemic involvement."
+    },
+    "Pityriasis Rosea": {
+        "category_id": "pityriasis_rosea",
+        "display_name": "Pityriasis Rosea (Herald Patch / Oval Plaque Pattern)",
+        "track": "Track A: Acute Exanthematous Dermatoses",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Oval erythematous patches with collarette scale. Usually a self-limiting exanthem; doctor consultation recommended to confirm diagnosis."
+    },
+    "Papilomatosis Confluentes And Reticulate": {
+        "category_id": "papilomatosis_confluentes",
+        "display_name": "Confluent and Reticulated Papillomatosis Pattern",
+        "track": "Track A: Rare Reticulated Dermatoses",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Reticulated hyperpigmented papules in central trunk. Clinical evaluation advised for oral tetracycline or antifungal consideration."
+    },
+
+    # 4. Track B: Concerning / Premalignant / Malignant Neoplasms
+    "Melanoma": {
+        "category_id": "suspicious_dysplastic_lesion",
+        "display_name": "Melanoma (High-Priority Pigmented Lesion Concern)",
+        "track": "Track B: Cutaneous Neoplasms (Prompt Clinical Evaluation Required)",
+        "is_concerning": True,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Visual features exhibit marked asymmetry, variegated pigment, or irregular borders statistically similar to malignant melanoma. Prompt in-person evaluation by a dermatologist with dermoscopy is essential."
+    },
+    "Basal Cell Carcinoma": {
+        "category_id": "suspicious_dysplastic_lesion",
+        "display_name": "Basal Cell Carcinoma (Cutaneous Neoplasm Concern)",
+        "track": "Track B: Cutaneous Neoplasms (Clinical Evaluation Required)",
+        "is_concerning": True,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Features suggestive of basal cell carcinoma (e.g. pearly border, telangiectasia, or slow ulceration). Clinical examination and biopsy are recommended."
+    },
+    "squamous cell carcinoma": {
+        "category_id": "suspicious_dysplastic_lesion",
+        "display_name": "Squamous Cell Carcinoma (Cutaneous Neoplasm Concern)",
+        "track": "Track B: Cutaneous Neoplasms (Clinical Evaluation Required)",
+        "is_concerning": True,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Hyperkeratotic, indurated, or ulcerating features statistically correlated with squamous cell carcinoma. Dermatologist evaluation is recommended."
+    },
+    "actinic keratosis": {
+        "category_id": "suspicious_dysplastic_lesion",
+        "display_name": "Actinic Keratosis (Pre-Cancerous Solar Keratosis Pattern)",
+        "track": "Track B: Pre-Cancerous Dysplastic Lesions (Doctor Check Recommended)",
+        "is_concerning": True,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Rough, scaly, sun-induced patch characteristic of actinic keratosis. Clinical check is recommended for preventive treatment."
+    },
+    "Porokeratosis Actinic": {
+        "category_id": "suspicious_dysplastic_lesion",
+        "display_name": "Disseminated Superficial Actinic Porokeratosis Pattern",
+        "track": "Track B: Dysplastic Lesions (Doctor Check Recommended)",
+        "is_concerning": True,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Annular papules with peripheral cornoid lamella border. Doctor evaluation recommended to monitor for malignant transformation."
+    },
+    "Mycosis Fungoides": {
+        "category_id": "suspicious_dysplastic_lesion",
+        "display_name": "Mycosis Fungoides Pattern (Cutaneous T-Cell Lymphoma)",
+        "track": "Track B: Specialized Lymphoproliferative Dermatoses",
+        "is_concerning": True,
+        "is_unsupported": True,
+        "triage_tier": 2,
+        "rationale": "Visual features correlate with cutaneous lymphoma patterns. Comprehensive clinical evaluation and tissue biopsy are strictly required."
+    },
+
+    # 5. Track B: Common Benign Cutaneous Lesions
+    "nevus": {
+        "category_id": "benign_melanocytic_macule",
+        "display_name": "Melanocytic Nevus (Common Benign Mole Pattern)",
+        "track": "Track B: Benign Cutaneous Lesions (Likely Benign)",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 1,
+        "rationale": "Uniform pigment and symmetric borders consistent with a common benign mole. Routine monthly self-monitoring recommended."
+    },
+    "seborrheic keratosis": {
+        "category_id": "benign_melanocytic_macule",
+        "display_name": "Seborrheic Keratosis (Common Benign Warty Lesion)",
+        "track": "Track B: Benign Cutaneous Lesions (Likely Benign)",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 1,
+        "rationale": "Well-circumscribed 'stuck-on' hyperkeratotic appearance typical of benign seborrheic keratosis. No immediate intervention required unless irritated."
+    },
+    "dermatofibroma": {
+        "category_id": "benign_melanocytic_macule",
+        "display_name": "Dermatofibroma (Benign Fibrous Nodule Pattern)",
+        "track": "Track B: Benign Cutaneous Lesions (Likely Benign)",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 1,
+        "rationale": "Firm dermal papule consistent with a benign dermatofibroma. Safe for routine observation unless symptomatic."
+    },
+    "pigmented benign keratosis": {
+        "category_id": "benign_melanocytic_macule",
+        "display_name": "Pigmented Benign Keratosis (Solar Lentigo / Keratosis)",
+        "track": "Track B: Benign Cutaneous Lesions (Likely Benign)",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 1,
+        "rationale": "Benign epidermal melanocytic hyperpigmentation. Regular sun protection and skin checks recommended."
+    },
+    "vascular lesion": {
+        "category_id": "benign_melanocytic_macule",
+        "display_name": "Vascular Lesion (Cherry Angioma / Capillary Pattern)",
+        "track": "Track B: Benign Cutaneous Lesions (Likely Benign)",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 1,
+        "rationale": "Well-defined reddish/purple vascular macule or papule typical of a benign cherry angioma or vascular malformation."
+    },
+    "Neurofibromatosis": {
+        "category_id": "benign_melanocytic_macule",
+        "display_name": "Neurofibroma / Café-au-Lait Feature Pattern",
+        "track": "Track B: Cutaneous Neurofibromas",
+        "is_concerning": False,
+        "is_unsupported": False,
+        "triage_tier": 2,
+        "rationale": "Soft cutaneous papules or macules consistent with neurofibroma. General physician review recommended for systemic assessment."
+    },
+
+    # 6. Specialized / Rare / Unsupported Systemic Dermatoses
+    "Darier_s Disease": {
+        "category_id": "unsupported_specialized_condition",
+        "display_name": "Darier's Disease Pattern (Keratosis Follicularis)",
+        "track": "Specialized Dermatoses: Requires In-Person Dermatologist Evaluation",
+        "is_concerning": False,
+        "is_unsupported": True,
+        "triage_tier": 2,
+        "rationale": "Visual features show crusted keratotic papules suggestive of Darier's disease. This is a specialized condition requiring clinical diagnosis, genetic assessment, and prescription dermatological management."
+    },
+    "Hailey-Hailey Disease": {
+        "category_id": "unsupported_specialized_condition",
+        "display_name": "Hailey-Hailey Disease Pattern (Familial Pemphigus)",
+        "track": "Specialized Dermatoses: Requires In-Person Dermatologist Evaluation",
+        "is_concerning": False,
+        "is_unsupported": True,
+        "triage_tier": 2,
+        "rationale": "Intertriginous maceration and erosions statistically similar to Hailey-Hailey disease. In-person specialist examination is essential."
+    },
+    "Epidermolysis Bullosa Pruriginosa": {
+        "category_id": "unsupported_specialized_condition",
+        "display_name": "Epidermolysis Bullosa Pruriginosa Pattern",
+        "track": "Specialized Dermatoses: Requires In-Person Dermatologist Evaluation",
+        "is_concerning": False,
+        "is_unsupported": True,
+        "triage_tier": 2,
+        "rationale": "Pruritic nodular or bullous features consistent with specialized mechanobullous disorders. Specialized dermatological evaluation is required."
+    },
+    "Leprosy Borderline": {
+        "category_id": "unsupported_specialized_condition",
+        "display_name": "Borderline Leprosy Pattern (Hansen's Disease)",
+        "track": "Specialized Infectious Disease: Requires Urgent Public Health / Clinical Check",
+        "is_concerning": False,
+        "is_unsupported": True,
+        "triage_tier": 2,
+        "rationale": "Hypopigmented or erythematous plaques with potential sensory changes. Urgent in-person evaluation by an infectious disease specialist or dermatologist is required."
+    },
+    "Leprosy Lepromatous": {
+        "category_id": "unsupported_specialized_condition",
+        "display_name": "Lepromatous Leprosy Pattern (Hansen's Disease)",
+        "track": "Specialized Infectious Disease: Requires Urgent Public Health / Clinical Check",
+        "is_concerning": False,
+        "is_unsupported": True,
+        "triage_tier": 2,
+        "rationale": "Diffuse infiltrative cutaneous plaques. Urgent in-person evaluation at a specialized clinic is required."
+    },
+    "Leprosy Tuberculoid": {
+        "category_id": "unsupported_specialized_condition",
+        "display_name": "Tuberculoid Leprosy Pattern (Hansen's Disease)",
+        "track": "Specialized Infectious Disease: Requires Urgent Public Health / Clinical Check",
+        "is_concerning": False,
+        "is_unsupported": True,
+        "triage_tier": 2,
+        "rationale": "Well-demarcated hypopigmented anesthetic plaque pattern. Medical evaluation is required for slit-skin smear and biopsy."
+    },
+    "Lupus Erythematosus Chronicus Discoides": {
+        "category_id": "unsupported_specialized_condition",
+        "display_name": "Discoid Lupus Erythematosus Pattern",
+        "track": "Specialized Autoimmune Dermatoses: Requires Rheumatology/Dermatology Evaluation",
+        "is_concerning": False,
+        "is_unsupported": True,
+        "triage_tier": 2,
+        "rationale": "Scarring, follicular plugging, and atrophic plaques suggestive of discoid lupus erythematosus. In-person biopsy and autoimmune serology are recommended."
+    }
 }
 
-# Track B: Lesions - Benign
-TRACK_B_BENIGN_CLASSES = {
-    "nevus",
-    "dermatofibroma",
-    "seborrheic keratosis",
-    "pigmented benign keratosis",
-    "vascular lesion",
-    "Neurofibromatosis"
-}
+# Compatibility sets
+TRACK_A_CLASSES = {k for k, v in DINOV2_CLASS_METADATA.items() if "Track A" in v.get("track", "")}
+TRACK_B_BENIGN_CLASSES = {k for k, v in DINOV2_CLASS_METADATA.items() if "Likely Benign" in v.get("track", "") or v.get("category_id") == "benign_melanocytic_macule"}
+TRACK_B_CONCERNING_CLASSES = {k for k, v in DINOV2_CLASS_METADATA.items() if v.get("is_concerning", False)}
 
-# Track B: Lesions - Concerning / Pre-malignant / Malignant (requires prompt clinical exam)
-TRACK_B_CONCERNING_CLASSES = {
-    "Melanoma",
-    "Basal Cell Carcinoma",
-    "squamous cell carcinoma",
-    "actinic keratosis",
-    "Porokeratosis Actinic",
-    "Mycosis Fungoides"
-}
+
+def get_dinov2_class_metadata(label: str) -> Dict[str, Any]:
+    """Retrieves full clinical metadata for a DINOv2 model class label."""
+    if not label:
+        return {
+            "category_id": "inconclusive",
+            "display_name": "Uncategorized Pattern",
+            "track": "Track C: Unclassified Pattern",
+            "is_concerning": False,
+            "is_unsupported": True,
+            "triage_tier": 2,
+            "rationale": "Visual features did not correspond to a recognized dermatological category."
+        }
+    
+    clean_l = label.strip()
+    if clean_l in DINOV2_CLASS_METADATA:
+        return DINOV2_CLASS_METADATA[clean_l]
+    
+    # Case-insensitive or partial match
+    lower = clean_l.lower()
+    for k, v in DINOV2_CLASS_METADATA.items():
+        if k.lower() == lower:
+            return v
+
+    # Fallback heuristics for unmapped classes
+    if any(k in lower for k in ("melanoma", "carcinoma", "actinic")):
+        return {
+            "category_id": "suspicious_dysplastic_lesion",
+            "display_name": f"{clean_l} (Cutaneous Neoplasm Concern)",
+            "track": "Track B: Cutaneous Neoplasms (Clinical Evaluation Required)",
+            "is_concerning": True,
+            "is_unsupported": False,
+            "triage_tier": 2,
+            "rationale": "Visual features suggest a concerning cutaneous lesion requiring in-person clinical check."
+        }
+    if any(k in lower for k in ("nevus", "mole", "keratosis", "vascular")):
+        return {
+            "category_id": "benign_melanocytic_macule",
+            "display_name": f"{clean_l} (Common Benign Feature Pattern)",
+            "track": "Track B: Benign Cutaneous Lesions (Likely Benign)",
+            "is_concerning": False,
+            "is_unsupported": False,
+            "triage_tier": 1,
+            "rationale": "Symmetric, regular features consistent with a benign skin lesion."
+        }
+
+    return {
+        "category_id": "inconclusive",
+        "display_name": f"Uncategorized Pattern: {clean_l}",
+        "track": "Track C: Unclassified Pattern",
+        "is_concerning": False,
+        "is_unsupported": True,
+        "triage_tier": 2,
+        "rationale": f"The visual model returned a pattern ({clean_l}) that could not be reliably categorized. In-person medical evaluation is recommended."
+    }
+
 
 def map_dinov2_label_to_clinical_category(label: str) -> Tuple[str, str, str]:
     """
     Maps a DINOv2 predicted class label to:
     (triage_category_id, track_name, clinical_display_name)
+    Maintains backwards compatibility while preserving distinct clinical identities.
     """
-    l = label.strip()
-
-    # Track B: Concerning Lesions
-    if l in TRACK_B_CONCERNING_CLASSES or any(k in l.lower() for k in ("melanoma", "carcinoma", "actinic")):
-        return (
-            "suspicious_dysplastic_lesion",
-            "Track B: Pigmented/Non-Pigmented Lesions (Requires Clinical Evaluation)",
-            f"{l} (Clinical Evaluation Recommended)"
-        )
-
-    # Track B: Benign Lesions
-    if l in TRACK_B_BENIGN_CLASSES or any(k in l.lower() for k in ("nevus", "mole", "keratosis", "dermatofibroma", "vascular")):
-        return (
-            "benign_melanocytic_macule",
-            "Track B: Pigmented/Non-Pigmented Lesions (Likely Benign)",
-            f"{l} (Common Benign Feature Pattern)"
-        )
-
-    # Track A: Specific Psoriasis
-    if "psoriasis" in l.lower():
-        return (
-            "psoriasis",
-            "Track A: Common Inflammatory Dermatoses",
-            "Psoriasis / Scaly Plaque Pattern"
-        )
-
-    # Track A: Specific Fungal Tinea
-    if "tinea" in l.lower() or "fung" in l.lower():
-        return (
-            "fungal_tinea",
-            "Track A: Superficial Cutaneous Infections",
-            f"{l} (Superficial Fungal Pattern)"
-        )
-
-    # Track A: Other inflammatory / infectious conditions
-    if l in TRACK_A_CLASSES:
-        return (
-            "eczema_contact_dermatitis",
-            "Track A: Common Inflammatory Dermatoses",
-            f"{l} (Inflammatory Dermatosis Pattern)"
-        )
-
-    return (
-        "inconclusive",
-        "Track C: Unclassified Pattern",
-        f"Uncategorized Pattern: {l}"
-    )
+    meta = get_dinov2_class_metadata(label)
+    return meta["category_id"], meta["track"], meta["display_name"]
 
 
 class DINOv2SkinClassifier:
@@ -202,14 +472,12 @@ class DINOv2SkinClassifier:
             
             # Load processor (cached locally by huggingface_hub)
             self._processor = AutoImageProcessor.from_pretrained(
-                self.model_id,
-                timeout=15.0
+                self.model_id
             )
 
-            # Load model weights
+            # Load model weights (without passing kwargs that trigger __init__ TypeError)
             model = AutoModelForImageClassification.from_pretrained(
-                self.model_id,
-                timeout=30.0
+                self.model_id
             )
             model.to(self._device)
             model.eval()
@@ -229,7 +497,7 @@ class DINOv2SkinClassifier:
     def predict(self, image_bytes: bytes) -> Dict[str, Any]:
         """
         Performs genuine forward pass through DINOv2 model.
-        Returns top predictions with true softmax probabilities.
+        Returns top predictions with true softmax probabilities and original model labels.
         """
         # 1. Image Preprocessing
         try:
@@ -274,15 +542,19 @@ class DINOv2SkinClassifier:
             for idx in ranked_indices[:5]:
                 class_name = self._model.config.id2label.get(int(idx), DINOV2_CLASSES.get(int(idx), f"Class_{idx}"))
                 score = float(probs[idx])
-                cat_id, track_name, display_name = map_dinov2_label_to_clinical_category(class_name)
+                meta = get_dinov2_class_metadata(class_name)
 
                 top_predictions.append({
                     "label": class_name,
-                    "display_name": display_name,
+                    "original_label": class_name,
+                    "display_name": meta["display_name"],
                     "score": round(score, 4),
                     "confidence_pct": round(score * 100, 1),
-                    "category_id": cat_id,
-                    "track": track_name
+                    "category_id": meta["category_id"],
+                    "track": meta["track"],
+                    "is_concerning": meta.get("is_concerning", False),
+                    "is_unsupported": meta.get("is_unsupported", False),
+                    "triage_tier": meta.get("triage_tier", 2)
                 })
 
             top1 = top_predictions[0]
@@ -290,7 +562,7 @@ class DINOv2SkinClassifier:
             top2_score = top_predictions[1]["score"] if len(top_predictions) > 1 else 0.0
             confidence_margin = round(top1_score - top2_score, 3)
 
-            # Rejection threshold for low confidence / ambiguous images
+            # Rejection threshold for low confidence / ambiguous images (< 20%)
             is_ambiguous = top1_score < 0.20
 
             return {
@@ -301,10 +573,13 @@ class DINOv2SkinClassifier:
                 "device": str(self._device),
                 "is_ambiguous": is_ambiguous,
                 "top_label": top1["label"],
+                "original_label": top1["label"],
                 "top_display_name": top1["display_name"],
                 "top_score": top1["score"],
                 "mapped_category": top1["category_id"] if not is_ambiguous else "inconclusive",
                 "track": top1["track"],
+                "is_concerning": top1["is_concerning"],
+                "is_unsupported": top1["is_unsupported"],
                 "confidence_margin": confidence_margin,
                 "top_predictions": top_predictions,
                 "supports_localization": False,
@@ -327,4 +602,3 @@ class DINOv2SkinClassifier:
             }
 
 dinov2_classifier = DINOv2SkinClassifier.get_instance()
-

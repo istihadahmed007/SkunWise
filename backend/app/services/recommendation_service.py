@@ -165,6 +165,251 @@ CLINICAL_KNOWLEDGE_BASE = {
             "Significant emotional distress or scarring from skin breakouts."
         ]
     },
+    "herpes_simplex": {
+        "title": "General Care & Guidance for Viral Blister Patterns (Herpes Simplex)",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.aad.org/public/diseases/a-z/herpes-simplex-overview",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "Possible visible concern: Small clustered fluid-filled blisters on an erythematous base, often accompanied by burning, tingling, or localized tenderness."
+        ),
+        "safe_self_care": [
+            "Keep clean and dry: Gently cleanse with mild unscented soap and water; pat dry with a clean paper towel to prevent cross-contamination.",
+            "Cool compress: Apply a cool, damp compress wrapped in a clean cloth for 10–15 minutes to soothe pain and burning.",
+            "Frequent hand hygiene: Wash hands thoroughly with soap and water after any contact with the affected area.",
+            "Seek medical check: An in-person doctor evaluation is recommended for diagnostic confirmation and prescription oral antiviral therapy if indicated."
+        ],
+        "what_to_avoid": [
+            "NEVER pop, pick, scratch, or squeeze blisters, which spreads the viral infection and increases scarring and bacterial superinfection risk.",
+            "Do NOT apply topical corticosteroid creams (such as hydrocortisone), which can suppress local immunity and worsen viral replication.",
+            "Avoid sharing towels, drinking glasses, lip balms, or having direct skin-to-skin contact while active blisters or crusts are present."
+        ],
+        "critical_warning_signs": [
+            "Blisters developing near or spreading to the eye, eyelid, or tip of the nose (urgent ophthalmology risk).",
+            "Severe headache, stiff neck, high fever, or confusion.",
+            "Widespread dissemination across the body or severely immunocompromised status."
+        ]
+    },
+    "impetigo": {
+        "title": "General Care for Honey-Colored Crusting Patterns (Impetigo)",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.cdc.gov/groupastrep/diseases-public/impetigo.html",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "Possible visible concern: Superficial sores or fragile blisters that rupture, leaving characteristic honey-colored or golden crusts, most commonly on the face or extremities."
+        ),
+        "safe_self_care": [
+            "In-person medical visit: Impetigo is a bacterial skin infection that typically requires prescription topical or oral antibiotics from a doctor.",
+            "Gentle crust soaking: Gently soften crusts with a warm, damp cloth and wash with mild soap without scrubbing.",
+            "Keep covered: Cover open sores with a breathable gauze bandage to help prevent spreading to others or other body sites.",
+            "Wash linens in hot water: Wash towels, clothing, and bedding separately in hot water."
+        ],
+        "what_to_avoid": [
+            "Do NOT scratch or pick at crusts, which can spread bacteria to other areas of the body.",
+            "Do NOT apply steroid creams, which worsen bacterial proliferation.",
+            "Avoid sharing personal towels, bedding, razors, or toys until evaluated and treated by a physician."
+        ],
+        "critical_warning_signs": [
+            "Rapidly expanding redness, warmth, or red streaks traveling along the skin (cellulitis).",
+            "Fever, chills, lethargy, or swollen tender lymph nodes.",
+            "Dark urine or facial puffiness 1–2 weeks following skin sores."
+        ]
+    },
+    "lichen_planus": {
+        "title": "General Care for Violaceous Polygonal Papules (Lichen Planus)",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://dermnetnz.org/topics/lichen-planus",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "Possible visible concern: Pruritic, violaceous (purple), flat-topped, polygonal papules, often displaying faint whitish lines (Wickham striae) on wrists, ankles, or lower back."
+        ),
+        "safe_self_care": [
+            "In-person clinical check: A dermatologist consultation is recommended for confirmation, topical treatment plan, and oral mucosal screening.",
+            "Gentle barrier hydration: Apply rich, fragrance-free moisturizing ointments to reduce skin dryness and soothe itch.",
+            "Cool compresses: Use cool damp cloths for 10 minutes to help relieve intense itching without scratching."
+        ],
+        "what_to_avoid": [
+            "Do NOT scratch or rub vigorously; skin trauma can trigger new lesions along scratch lines (Koebner phenomenon).",
+            "Avoid harsh alkaline soaps, hot water, and abrasive sponges.",
+            "Do not apply unprescribed medicated topicals without physician guidance."
+        ],
+        "critical_warning_signs": [
+            "Painful erosive sores inside the mouth, gums, or genital mucosa.",
+            "Hair thinning or scarring alopecia on the scalp.",
+            "Nail dystrophy, ridging, or thinning."
+        ]
+    },
+    "molluscum_contagiosum": {
+        "title": "General Care for Pearly Umbilicated Papules (Molluscum Contagiosum)",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.cdc.gov/poxvirus/molluscum-contagiosum/index.html",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "Possible visible concern: Small, firm, dome-shaped papules with a characteristic central dimple or umbilication and a shiny, pearly appearance."
+        ),
+        "safe_self_care": [
+            "Keep bumps covered: Keep affected areas covered with clothing or a small breathable bandage to reduce transmission.",
+            "Frequent handwashing: Wash hands with soap and water after any contact with the bumps.",
+            "Consult a physician: Schedule an in-person doctor evaluation for monitoring and professional management options."
+        ],
+        "what_to_avoid": [
+            "Do NOT squeeze, pick, scratch, or try to excise the central core at home (causes autoinoculation and scarring).",
+            "Avoid sharing towels, washcloths, or clothing with family members.",
+            "Avoid shaving over areas with active bumps."
+        ],
+        "critical_warning_signs": [
+            "Bumps developing surrounding intense redness, warmth, or pus (secondary bacterial infection).",
+            "Lesions appearing on or around the eyelids.",
+            "Very large or widespread lesions in individuals with compromised immunity."
+        ]
+    },
+    "pityriasis_rosea": {
+        "title": "General Care for Oval Patch Patterns (Pityriasis Rosea)",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.aad.org/public/diseases/a-z/pityriasis-rosea-overview",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "Possible visible concern: An initial larger oval patch (herald patch) followed by smaller salmon-pink or fawn-colored scaly plaques along cleavage lines in a Christmas-tree distribution."
+        ),
+        "safe_self_care": [
+            "Doctor check recommended: An in-person medical evaluation helps distinguish pityriasis rosea from other causes such as tinea or secondary rashes.",
+            "Lukewarm baths & colloidal oatmeal: Bathe in lukewarm water with gentle oatmeal soaks to soothe itch.",
+            "Generous plain moisturizer: Apply fragrance-free creams or lotions after bathing to prevent dryness."
+        ],
+        "what_to_avoid": [
+            "Avoid hot water and aggressive towel rubbing, which aggravate itch and inflammation.",
+            "Avoid strenuous workouts in high heat, which can exacerbate the eruption.",
+            "Do NOT apply harsh abrasive scrubs or bleaching creams."
+        ],
+        "critical_warning_signs": [
+            "Rash accompanied by fever, sore throat, or joint pains.",
+            "Rash appearing on the palms of hands or soles of feet.",
+            "Lesions that do not fade within 8 to 10 weeks."
+        ]
+    },
+    "pediculosis_capitis": {
+        "title": "General Care & Guidance for Ectoparasitic Infestation (Pediculosis)",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.cdc.gov/parasites/lice/head/index.html",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "Possible visible concern: Intense itching, excoriation marks, or visible nits/parasites in hairy or intertriginous areas."
+        ),
+        "safe_self_care": [
+            "Doctor or pharmacist evaluation: Consult a healthcare professional for approved pediculicide treatment options.",
+            "Fine-toothed wet combing: Carefully comb wet hair with a specialized nit comb to remove eggs.",
+            "Launder clothing and bedding: Wash recent bedding, hats, and towels in hot water (at least 130°F / 54°C) and machine dry on high heat."
+        ],
+        "what_to_avoid": [
+            "Do NOT apply unverified chemicals, kerosene, or veterinary products to human skin.",
+            "Avoid sharing hats, brushes, helmets, or pillowcases.",
+            "Do not scratch intensely to avoid secondary bacterial infection."
+        ],
+        "critical_warning_signs": [
+            "Signs of secondary infection: swollen tender lymph nodes, oozing pus, or crusted sores on the scalp or neck.",
+            "Severe allergic reactions or skin breakdown."
+        ]
+    },
+    "larva_migrans": {
+        "title": "General Care for Serpiginous Track Patterns (Cutaneous Larva Migrans)",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.cdc.gov/parasites/zoonotichookworm/index.html",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "Possible visible concern: Advancing, intensely pruritic, reddish snake-like (serpiginous) linear tracks on feet, legs, or body following contact with warm, moist soil or sand."
+        ),
+        "safe_self_care": [
+            "Doctor check required: Cutaneous larva migrans requires prescription antihelmintic medical treatment (such as albendazole or ivermectin) from a physician.",
+            "Cool compresses: Apply cool damp cloths to temporarily ease intense itching.",
+            "Keep the area clean: Wash gently with mild soap and water."
+        ],
+        "what_to_avoid": [
+            "Do NOT attempt to cut, freeze, or chemically cauterize the track at home.",
+            "Do NOT scratch the track, which introduces bacteria and causes secondary cellulitis.",
+            "Avoid walking barefoot on contaminated sand or soil."
+        ],
+        "critical_warning_signs": [
+            "Rapidly spreading cellulitis, redness, red streaks, or throbbing pain.",
+            "Fever, wheezing, or widespread symptoms."
+        ]
+    },
+    "tungiasis": {
+        "title": "General Care for Plantar Flea Ectoparasitosis (Tungiasis)",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.who.int/news-room/fact-sheets/detail/tungiasis",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "Possible visible concern: Punctiform papule or nodule with a central dark spot and surrounding pale or erythematous halo, typically located on toes, soles, or periungual regions."
+        ),
+        "safe_self_care": [
+            "Doctor visit required: Tungiasis requires sterile surgical extraction and tetanus prophylaxis by a healthcare provider.",
+            "Antiseptic cleansing: Keep the foot clean with mild antiseptic wash.",
+            "Wear protective footwear: Always wear closed-toe shoes and socks in endemic sandy/earthen areas."
+        ],
+        "what_to_avoid": [
+            "NEVER attempt non-sterile extraction at home with unsterilized needles or pins (high tetanus and gangrene risk).",
+            "Do not walk barefoot on unpaved or sandy floors in affected regions."
+        ],
+        "critical_warning_signs": [
+            "Severe throbbing foot pain, swelling, inability to bear weight.",
+            "Signs of secondary infection: red streaks, foul odor, or fever."
+        ]
+    },
+    "papilomatosis_confluentes": {
+        "title": "General Care for Confluent and Reticulated Papillomatosis Patterns",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://dermnetnz.org/topics/confluent-and-reticulated-papillomatosis",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "Possible visible concern: Hyperpigmented, slightly verrucous or scaly macules and papules coalescing centrally and forming a net-like (reticulated) pattern peripherally on the chest or back."
+        ),
+        "safe_self_care": [
+            "Dermatologist consultation: An in-person visit is recommended; CRP often responds well to specific prescription oral antibiotics or topical retinoids.",
+            "Gentle cleansing: Wash with a mild, non-irritating cleanser and pat dry.",
+            "Avoid aggressive scrubbing: Friction and harsh exfoliation can worsen hyperkeratosis."
+        ],
+        "what_to_avoid": [
+            "Do NOT aggressively scrub with loofahs or abrasive chemicals.",
+            "Avoid unprescribed bleaching or depigmenting preparations."
+        ],
+        "critical_warning_signs": [
+            "Rapid lesion evolution, pain, or widespread skin breakdown."
+        ]
+    },
+    "unsupported_specialized_condition": {
+        "title": "Specialized Dermatological Presentation (In-Person Clinical Evaluation Required)",
+        "publisher": "Dermatology Educational Guidance",
+        "reference_url": "https://www.aad.org/public/diseases",
+        "last_reviewed": "2025",
+        "approval_status": "Reviewed Medical Reference",
+        "clinical_summary": (
+            "Specialized observation: The visual features in this photo correspond to a complex, systemic, or specialized dermatosis that cannot be safely triaged by automated software. An in-person medical evaluation with a qualified dermatologist is strongly advised."
+        ),
+        "safe_self_care": [
+            "Schedule dermatologist consultation: Book an in-person physical examination with a qualified specialist for comprehensive clinical evaluation and diagnostic testing.",
+            "Gentle supportive care: Use only plain lukewarm water and mild, fragrance-free moisturizing lotion to maintain skin hydration.",
+            "Keep records: Note when symptoms began, whether they change with temperature or foods, and bring a list of all current medications to your doctor visit."
+        ],
+        "what_to_avoid": [
+            "Do NOT self-medicate with high-potency steroid creams, antibiotics, or aggressive home remedies.",
+            "Do NOT pick, scratch, or abrade the skin surface.",
+            "Do not rely solely on mobile or automated photo assessment for complex skin conditions."
+        ],
+        "critical_warning_signs": [
+            "Widespread skin peeling, blistering, or mucosal (mouth/eye/genital) involvement.",
+            "Fever, chills, facial swelling, or breathing difficulty.",
+            "Severe worsening pain or rapidly spreading skin lesions."
+        ]
+    },
     "general_skin_care": {
         "title": "General Conservative Skin Barrier Care",
         "publisher": "Dermatology Educational Guidance",
@@ -230,34 +475,28 @@ class RecommendationEngine:
 
         matches: List[ConditionMatchModel] = []
 
-        # Genuine model scores (start from 0.0, never fabricate 0.05 baseline)
-        eczema_prob = probs.get("eczema_contact_dermatitis", 0.0)
-        dysplasia_prob = probs.get("suspicious_dysplastic_lesion", 0.0)
-        benign_prob = probs.get("benign_melanocytic_macule", 0.0)
-        psoriasis_prob = probs.get("psoriasis", 0.0)
-        fungal_prob = probs.get("fungal_tinea", 0.0)
-        acne_prob = probs.get("acne_vulgaris", 0.0)
+        # Build dynamic weighted score list preserving all supported model categories
+        weighted = []
+        for cond_key, score in probs.items():
+            s = float(score)
+            if s <= 0.0 and cond_key != matched_cat:
+                continue
 
-        # Subtle symptom-concordance adjustments (max +0.10) to reflect patient clinical context
-        if symptoms.prior_chemical_exposure and eczema_prob > 0:
-            eczema_prob += 0.05
-        if symptoms.bleeding_or_crusting and dysplasia_prob > 0:
-            dysplasia_prob += 0.08
-        if "psoriasis" in (symptoms.personal_skin_history or "").lower() and psoriasis_prob > 0:
-            psoriasis_prob += 0.05
-        if symptoms.itch_score >= 5 and fungal_prob > 0:
-            fungal_prob += 0.03
+            # Subtle symptom-concordance adjustments (max +0.08) to reflect patient clinical context
+            if cond_key == "eczema_contact_dermatitis" and symptoms.prior_chemical_exposure and s > 0:
+                s += 0.05
+            elif cond_key == "suspicious_dysplastic_lesion" and symptoms.bleeding_or_crusting and s > 0:
+                s += 0.08
+            elif cond_key == "psoriasis" and "psoriasis" in (symptoms.personal_skin_history or "").lower() and s > 0:
+                s += 0.05
+            elif cond_key == "fungal_tinea" and symptoms.itch_score >= 5 and s > 0:
+                s += 0.03
+            elif cond_key == "impetigo" and symptoms.bleeding_or_crusting and s > 0:
+                s += 0.05
 
-        weighted = [
-            ("eczema_contact_dermatitis", round(eczema_prob, 4)),
-            ("suspicious_dysplastic_lesion", round(dysplasia_prob, 4)),
-            ("benign_melanocytic_macule", round(benign_prob, 4)),
-            ("psoriasis", round(psoriasis_prob, 4)),
-            ("fungal_tinea", round(fungal_prob, 4)),
-            ("acne_vulgaris", round(acne_prob, 4)),
-        ]
-        # Filter out conditions with 0 score, unless it was the matched category
-        weighted = [w for w in weighted if w[1] > 0.0 or w[0] == matched_cat]
+            weighted.append((cond_key, round(s, 4)))
+
+        # Sort highest concordance first
         weighted.sort(key=lambda x: x[1], reverse=True)
 
         for rank, (cond_key, score) in enumerate(weighted[:3]):
@@ -265,10 +504,17 @@ class RecommendationEngine:
             if score < 0.20 and cond_key != matched_cat:
                 continue
 
-            kb_data = CLINICAL_KNOWLEDGE_BASE.get(cond_key, {})
+            kb_data = CLINICAL_KNOWLEDGE_BASE.get(cond_key, CLINICAL_KNOWLEDGE_BASE.get("general_skin_care", {}))
             cond_meta = SUPPORTED_CONDITIONS.get(cond_key, {})
 
             concordance = "Primary pattern consideration" if rank == 0 else "Other possible consideration"
+
+            # Determine display name from original model metadata or supported conditions
+            model_display_name = cond_meta.get("name")
+            if not model_display_name and gemini_inf and isinstance(gemini_inf, dict):
+                model_display_name = gemini_inf.get("primary_concern")
+            if not model_display_name:
+                model_display_name = kb_data.get("title", cond_key)
 
             if cond_key == "eczema_contact_dermatitis":
                 visual_overlap = "Visible redness, dry texture, or surface irritation"
@@ -285,13 +531,34 @@ class RecommendationEngine:
             elif cond_key == "fungal_tinea":
                 visual_overlap = "Curved or circular reddish margin observed"
                 history_corr = "Gradual spread reported by user"
-            else:
+            elif cond_key == "acne_vulgaris":
                 visual_overlap = "Small localized bumps or blemishes"
                 history_corr = "Location consistent with oil-producing skin areas"
+            elif cond_key == "herpes_simplex":
+                visual_overlap = "Clustered vesicular pattern on an erythematous base"
+                history_corr = "Localized discomfort or burning reported"
+            elif cond_key == "impetigo":
+                visual_overlap = "Superficial crusting or honey-colored surface discharge"
+                history_corr = f"Reported crusting/oozing with duration of {symptoms.duration_days} days"
+            elif cond_key == "lichen_planus":
+                visual_overlap = "Violaceous flat-topped polygonal papular morphology"
+                history_corr = f"Reported itch: {symptoms.itch_score}/10"
+            elif cond_key == "molluscum_contagiosum":
+                visual_overlap = "Discrete dome-shaped umbilicated papules"
+                history_corr = "Pearly localized lesions without acute pain"
+            elif cond_key == "pityriasis_rosea":
+                visual_overlap = "Scaly oval or herald patch pattern"
+                history_corr = f"Onset reported {symptoms.duration_days} days ago"
+            elif cond_key in ("pediculosis_capitis", "larva_migrans", "tungiasis"):
+                visual_overlap = "Ectoparasitic or serpiginous track morphology"
+                history_corr = f"High discomfort (Itch: {symptoms.itch_score}/10, Pain: {symptoms.pain_score}/10)"
+            else:
+                visual_overlap = "Specialized dermatological morphological pattern"
+                history_corr = "Requires in-person clinical examination by a dermatologist"
 
             matches.append(ConditionMatchModel(
                 condition_id=cond_key,
-                name=cond_meta.get("name", kb_data.get("title", cond_key)),
+                name=model_display_name,
                 category=cond_meta.get("category", "Visible Skin Pattern"),
                 concordance_tier=concordance,
                 visual_overlap=visual_overlap,

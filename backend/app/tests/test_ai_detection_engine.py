@@ -23,6 +23,13 @@ from app.services.image_quality import evaluate_image_quality
 from app.services.image_validation import sanitize_and_validate_image
 
 
+@pytest.fixture(autouse=True)
+def configure_dinov2_test_mode(monkeypatch):
+    """Ensure DINOv2 engine tests use dinov2 provider."""
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "PRIMARY_AI_PROVIDER", "dinov2")
+
+
 # ============================================================================
 # Reproducible Dermatological Image Fixture Generators
 # ============================================================================
@@ -431,3 +438,133 @@ def test_15_emergency_symptom_override_precedence():
     assert pathway["emergency_warning_detected"] is True
     assert "Urgent" in pathway["triage_name"]
     assert len(pathway["emergency_warning_items"]) >= 2
+
+
+def test_16_herpes_simplex_preserves_label_not_eczema():
+    """16. Herpes Simplex preserves its genuine clinical identity and is never forced into Eczema."""
+    cat, track, name = map_dinov2_label_to_clinical_category("Herpes Simplex")
+    assert cat == "herpes_simplex"
+    assert cat != "eczema_contact_dermatitis"
+    assert "Herpes" in name
+    assert "Eczema" not in name
+
+    # Test full multimodal recommendation synthesis
+    symptoms = SymptomQuestionnaireInput(
+        anatomical_region="Perioral",
+        duration_days=3,
+        itch_score=4,
+        pain_score=6,
+        consent_biometric=True,
+        consent_disclaimer=True
+    )
+    visual_findings = {
+        "inference_status": "successful",
+        "is_inconclusive": False,
+        "matched_category": "herpes_simplex",
+        "observed_pattern_scores": {"herpes_simplex": 0.88, "eczema_contact_dermatitis": 0.05},
+        "calibrated_probabilities": {"herpes_simplex": 0.88, "eczema_contact_dermatitis": 0.05},
+        "gemini_inference": {
+            "matched_category": "herpes_simplex",
+            "primary_concern": "Herpes Simplex (HSV)"
+        }
+    }
+    conditions = recommendation_engine.synthesize_multimodal_evidence(symptoms, visual_findings)
+    assert len(conditions) > 0
+    assert conditions[0].condition_id == "herpes_simplex"
+    assert "Herpes" in conditions[0].name
+    assert "Eczema" not in conditions[0].name
+
+
+def test_17_impetigo_preserves_label_not_eczema():
+    """17. Impetigo maps to bacterial infection category and never Eczema."""
+    cat, track, name = map_dinov2_label_to_clinical_category("Impetigo")
+    assert cat == "impetigo"
+    assert cat != "eczema_contact_dermatitis"
+    assert "Impetigo" in name
+
+    symptoms = SymptomQuestionnaireInput(
+        anatomical_region="Face",
+        duration_days=4,
+        itch_score=5,
+        bleeding_or_crusting=True,
+        consent_biometric=True,
+        consent_disclaimer=True
+    )
+    visual_findings = {
+        "inference_status": "successful",
+        "is_inconclusive": False,
+        "matched_category": "impetigo",
+        "observed_pattern_scores": {"impetigo": 0.91},
+        "calibrated_probabilities": {"impetigo": 0.91},
+        "gemini_inference": {
+            "matched_category": "impetigo",
+            "primary_concern": "Impetigo"
+        }
+    }
+    conditions = recommendation_engine.synthesize_multimodal_evidence(symptoms, visual_findings)
+    assert len(conditions) > 0
+    assert conditions[0].condition_id == "impetigo"
+    assert "Impetigo" in conditions[0].name
+
+
+def test_18_specialized_unsupported_conditions_route_to_specialist():
+    """18. Specialized/rare conditions route to unsupported_specialized_condition and Tier 2."""
+    for rare_label in ("Darier_s Disease", "Hailey-Hailey Disease", "Leprosy Borderline", "Lupus Erythematosus Chronicus Discoides"):
+        cat, track, name = map_dinov2_label_to_clinical_category(rare_label)
+        assert cat == "unsupported_specialized_condition", f"{rare_label} should map to unsupported_specialized_condition"
+
+    symptoms = SymptomQuestionnaireInput(
+        anatomical_region="Trunk",
+        duration_days=30,
+        itch_score=2,
+        pain_score=1,
+        consent_biometric=True,
+        consent_disclaimer=True
+    )
+    visual = {
+        "inference_status": "successful",
+        "is_inconclusive": False,
+        "matched_category": "unsupported_specialized_condition",
+        "observed_pattern_scores": {"unsupported_specialized_condition": 0.75},
+        "calibrated_probabilities": {"unsupported_specialized_condition": 0.75},
+        "gemini_inference": {
+            "matched_category": "unsupported_specialized_condition",
+            "primary_concern": "Specialized Dermatosis"
+        }
+    }
+    pathway = triage_service.determine_care_pathway(
+        symptoms=symptoms,
+        visual_findings=visual,
+        is_quality_acceptable=True
+    )
+    assert pathway["triage_tier"] == 2
+    assert "Doctor Check Recommended" in pathway["triage_name"]
+
+
+def test_19_intake_consent_defaults_and_explicit_rejection(client: TestClient):
+    """19. Omitting consent in symptom questionnaire defaults safely, while explicit rejection fails with 400."""
+    # SymptomQuestionnaireInput defaults consent fields to True
+    symptoms = SymptomQuestionnaireInput(
+        anatomical_region="Volar Forearm",
+        duration_days=5
+    )
+    assert symptoms.consent_biometric is True
+    assert symptoms.consent_disclaimer is True
+
+    # Explicit False triggers 400 Bad Request
+    headers = get_patient_auth(client, "consent.test@example.com")
+    img = create_skin_fixture()
+    denied_symptoms = {
+        "anatomical_region": "Volar Forearm",
+        "duration_days": 5,
+        "consent_biometric": False,
+        "consent_disclaimer": False
+    }
+    res = client.post(
+        "/api/skin/analyze",
+        files={"file": ("skin.jpg", img, "image/jpeg")},
+        data={"symptoms_json": json.dumps(denied_symptoms)},
+        headers=headers
+    )
+    assert res.status_code == 400
+    assert "Mandatory consent missing" in res.json()["detail"]

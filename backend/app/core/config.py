@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
 from typing import List
-from pydantic import model_validator, ConfigDict
-from pydantic_settings import BaseSettings
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_FILE_PATH = BASE_DIR / ".env"
 is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 default_db = "sqlite:////tmp/skinwise.db" if is_serverless else f"sqlite:///{BASE_DIR}/skinwise.db"
 default_storage = Path("/tmp/skinwise_storage") if is_serverless else BASE_DIR / "storage"
@@ -59,20 +60,20 @@ class Settings(BaseSettings):
     MAX_GLARE_RATIO: float = 0.08
     
     # AI Engine Configuration
-    PRIMARY_AI_PROVIDER: str = os.getenv("PRIMARY_AI_PROVIDER", "dinov2").lower().strip()
-    ENABLE_HUGGINGFACE_FALLBACK: bool = os.getenv("ENABLE_HUGGINGFACE_FALLBACK", "true").lower() == "true"
+    PRIMARY_AI_PROVIDER: str = "gemini"
+    ENABLE_HUGGINGFACE_FALLBACK: bool = True
     AI_MODEL_BACKBONE: str = "gemini-3.5-flash-lite"
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
     
-    HF_TOKEN: str = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY", "")
-    HF_MODEL_ID: str = os.getenv("HF_MODEL_ID", "Jayanth2002/dinov2-base-finetuned-SkinDisease")
+    HF_TOKEN: str = ""
+    HF_MODEL_ID: str = "Jayanth2002/dinov2-base-finetuned-SkinDisease"
     HF_ROUTER_URL: str = "https://router.huggingface.co/hf-inference/models"
 
     # Public APIs (openFDA & Open-Meteo)
-    OPENFDA_API_KEY: str = os.getenv("OPENFDA_API_KEY", "")
-    OPENFDA_COSMETICS_URL: str = os.getenv("OPENFDA_COSMETICS_URL", "https://api.fda.gov/cosmetic/event.json")
-    OPEN_METEO_UV_URL: str = os.getenv("OPEN_METEO_UV_URL", "https://api.open-meteo.com/v1/forecast")
+    OPENFDA_API_KEY: str = ""
+    OPENFDA_COSMETICS_URL: str = "https://api.fda.gov/cosmetic/event.json"
+    OPEN_METEO_UV_URL: str = "https://api.open-meteo.com/v1/forecast"
     
     SUPPORTED_CATEGORIES: List[str] = [
         "eczema_contact_dermatitis",
@@ -80,7 +81,17 @@ class Settings(BaseSettings):
         "psoriasis",
         "fungal_tinea",
         "benign_melanocytic_macule",
-        "suspicious_dysplastic_lesion"
+        "suspicious_dysplastic_lesion",
+        "herpes_simplex",
+        "impetigo",
+        "lichen_planus",
+        "molluscum_contagiosum",
+        "pityriasis_rosea",
+        "pediculosis_capitis",
+        "larva_migrans",
+        "tungiasis",
+        "papilomatosis_confluentes",
+        "unsupported_specialized_condition"
     ]
     
     CORS_ORIGINS: List[str] = [
@@ -90,7 +101,12 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3001",
     ]
 
-    model_config = ConfigDict(case_sensitive=True)
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_FILE_PATH),
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"
+    )
 
     @model_validator(mode="after")
     def validate_production_security(self):

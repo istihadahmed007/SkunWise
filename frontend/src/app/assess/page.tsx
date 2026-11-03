@@ -90,10 +90,12 @@ export default function AssessPage() {
       lower.includes("503") ||
       lower.includes("500") ||
       lower.includes("502") ||
+      lower.includes("504") ||
       lower.includes("404") ||
       lower.includes("connection") ||
       lower.includes("failed to fetch") ||
       lower.includes("network") ||
+      lower.includes("internal server error") ||
       lower.includes("failed with status")
     ) {
       return language === "bn"

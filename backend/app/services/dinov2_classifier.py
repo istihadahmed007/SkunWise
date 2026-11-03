@@ -1,6 +1,7 @@
 import io
 import os
 import logging
+import threading
 from typing import Dict, Any, List, Optional, Tuple
 from PIL import Image
 import numpy as np
@@ -426,6 +427,7 @@ class DINOv2SkinClassifier:
     """
 
     _instance: Optional["DINOv2SkinClassifier"] = None
+    _load_lock = threading.Lock()
 
     def __init__(self):
         self.model_id = settings.HF_MODEL_ID
@@ -439,7 +441,9 @@ class DINOv2SkinClassifier:
     @classmethod
     def get_instance(cls) -> "DINOv2SkinClassifier":
         if cls._instance is None:
-            cls._instance = DINOv2SkinClassifier()
+            with cls._load_lock:
+                if cls._instance is None:
+                    cls._instance = DINOv2SkinClassifier()
         return cls._instance
 
     def _initialize_device(self):
@@ -458,41 +462,46 @@ class DINOv2SkinClassifier:
         """
         Loads the fine-tuned DINOv2 model and image processor.
         Cached in memory as a singleton across API requests.
+        Thread-safe: Prevents duplicate model initialization under concurrent requests.
         """
         if self.is_loaded():
             return True
 
-        self._initialize_device()
+        with self._load_lock:
+            if self.is_loaded():
+                return True
 
-        try:
-            from transformers import AutoImageProcessor, AutoModelForImageClassification
-            import torch
+            self._initialize_device()
 
-            logger.info("Loading DINOv2 skin classifier model: %s", self.model_id)
-            
-            # Load processor (cached locally by huggingface_hub)
-            self._processor = AutoImageProcessor.from_pretrained(
-                self.model_id
-            )
+            try:
+                from transformers import AutoImageProcessor, AutoModelForImageClassification
+                import torch
 
-            # Load model weights (without passing kwargs that trigger __init__ TypeError)
-            model = AutoModelForImageClassification.from_pretrained(
-                self.model_id
-            )
-            model.to(self._device)
-            model.eval()
-            self._model = model
+                logger.info("Loading DINOv2 skin classifier model: %s", self.model_id)
+                
+                # Load processor (cached locally by huggingface_hub)
+                self._processor = AutoImageProcessor.from_pretrained(
+                    self.model_id
+                )
 
-            self._is_initialized = True
-            self._init_error = None
-            logger.info("DINOv2 skin classifier successfully loaded on %s", self._device)
-            return True
+                # Load model weights (without passing kwargs that trigger __init__ TypeError)
+                model = AutoModelForImageClassification.from_pretrained(
+                    self.model_id
+                )
+                model.to(self._device)
+                model.eval()
+                self._model = model
 
-        except Exception as err:
-            err_msg = f"Failed to load local DINOv2 model ({type(err).__name__}): {str(err)}"
-            logger.warning(err_msg)
-            self._init_error = err_msg
-            return False
+                self._is_initialized = True
+                self._init_error = None
+                logger.info("DINOv2 skin classifier successfully loaded on %s", self._device)
+                return True
+
+            except Exception as err:
+                err_msg = f"Failed to load local DINOv2 model ({type(err).__name__}): {str(err)}"
+                logger.warning(err_msg)
+                self._init_error = err_msg
+                return False
 
     def predict(self, image_bytes: bytes) -> Dict[str, Any]:
         """

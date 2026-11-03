@@ -45,19 +45,29 @@ def get_uv_forecast(
 def get_models_status():
     """
     Report the operational status, architecture, and spatial capabilities of integrated AI models.
+    Honestly reflects whether a model is the active provider, a configured standby, or unconfigured.
     """
     ai_status = vision_engine.get_ai_engine_status()
+    active_mode = ai_status.get("active_mode", "inconclusive_safe_mode")
+    is_gemini_active = (active_mode == "gemini_primary")
+    is_hf_active = active_mode in ("huggingface_primary", "huggingface_fallback")
+
+    hf_meta = huggingface_adapter.get_model_metadata()
+    hf_status = "active" if is_hf_active else ("ready" if huggingface_adapter.is_configured() else "unconfigured")
+    hf_meta_updated = {**hf_meta, "status": hf_status}
+
     return {
         "engine_architecture": ai_status,
+        "active_mode": active_mode,
         "primary_vision_engine": {
             "model_id": ai_status["gemini"]["model_id"],
             "provider": "Google Multimodal API",
-            "status": "active" if ai_status["gemini"]["configured"] else "offline_fallback",
+            "status": "active" if is_gemini_active else ("ready" if ai_status["gemini"]["configured"] else "unconfigured"),
             "supports_localization": True,
             "bounding_box_format": "[ymin, xmin, ymax, xmax] normalized (0-1000)",
             "multimodal": True
         },
-        "huggingface_dermatology_engine": huggingface_adapter.get_model_metadata(),
+        "huggingface_dermatology_engine": hf_meta_updated,
         "public_apis": {
             "openfda_cosmetics": {
                 "name": "FDA CAERS Cosmetic Adverse Events",

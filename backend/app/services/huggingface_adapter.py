@@ -105,85 +105,82 @@ class HuggingFaceVisionAdapter:
                 "predictions": []
             }
 
-        try:
-            with httpx.Client(timeout=self.REQUEST_TIMEOUT) as client:
-                response = client.post(self.router_url, headers=headers, content=payload_bytes)
+        # Controlled retry logic for transient connectivity or rapid warmup
+        max_attempts = 2
+        raw_preds = None
 
-                # Fallback to standard inference API endpoint if router endpoint returns 404
-                if response.status_code == 404:
-                    response = client.post(self.fallback_api_url, headers=headers, content=payload_bytes)
+        for attempt in range(max_attempts):
+            try:
+                with httpx.Client(timeout=self.REQUEST_TIMEOUT) as client:
+                    response = client.post(self.router_url, headers=headers, content=payload_bytes)
 
-                if response.status_code == 503:
-                    # Model is currently loading on Hugging Face infrastructure
-                    err_json = response.json() if "application/json" in response.headers.get("content-type", "") else {}
-                    estimated_time = err_json.get("estimated_time", 20.0)
-                    return {
-                        "success": False,
-                        "status": "model_loading",
-                        "model_id": self.model_id,
-                        "estimated_wait_seconds": estimated_time,
-                        "message": f"Hugging Face model {self.model_id} is currently warming up on serverless infrastructure. Please retry in ~{int(estimated_time)}s.",
-                        "predictions": []
-                    }
+                    # Fallback to standard inference API endpoint if router endpoint returns 404
+                    if response.status_code == 404:
+                        response = client.post(self.fallback_api_url, headers=headers, content=payload_bytes)
 
-                if response.status_code in (401, 403):
-                    return {
-                        "success": False,
-                        "status": "unauthorized",
-                        "model_id": self.model_id,
-                        "message": "Invalid or expired Hugging Face API token. Please check HF_TOKEN in backend environment variables.",
-                        "predictions": []
-                    }
+                    if response.status_code == 503:
+                        # Model is currently loading on Hugging Face infrastructure
+                        err_json = response.json() if "application/json" in response.headers.get("content-type", "") else {}
+                        estimated_time = err_json.get("estimated_time", 20.0)
+                        if attempt == 0 and estimated_time <= 4.0:
+                            time.sleep(min(estimated_time, 2.0))
+                            continue
+                        return {
+                            "success": False,
+                            "status": "model_loading",
+                            "model_id": self.model_id,
+                            "estimated_wait_seconds": estimated_time,
+                            "message": f"Hugging Face model {self.model_id} is currently warming up on serverless infrastructure. Please retry in ~{int(estimated_time)}s.",
+                            "predictions": []
+                        }
 
-                response.raise_for_status()
-                raw_preds = response.json()
+                    if response.status_code in (401, 403):
+                        return {
+                            "success": False,
+                            "status": "unauthorized",
+                            "model_id": self.model_id,
+                            "message": "Invalid or expired Hugging Face API token. Please check HF_TOKEN in backend environment variables.",
+                            "predictions": []
+                        }
 
-                # Expected HF format: list of dicts [{"label": str, "score": float}, ...]
-                if not isinstance(raw_preds, list):
-                    return {
-                        "success": False,
-                        "status": "unexpected_format",
-                        "model_id": self.model_id,
-                        "message": f"Unexpected response structure from Hugging Face model: {raw_preds}",
-                        "predictions": []
-                    }
+                    response.raise_for_status()
+                    raw_preds = response.json()
+                    break
 
-                # Sort by score descending
-                sorted_preds = sorted(raw_preds, key=lambda x: x.get("score", 0.0), reverse=True)
-
+            except (httpx.ConnectError, httpx.ReadError) as net_err:
+                if attempt == 0:
+                    time.sleep(1.0)
+                    continue
                 return {
-                    "success": True,
-                    "status": "completed",
+                    "success": False,
+                    "status": "error",
                     "model_id": self.model_id,
-                    "predictions": sorted_preds[:5],
-                    "top_label": sorted_preds[0].get("label") if sorted_preds else None,
-                    "top_score": sorted_preds[0].get("score") if sorted_preds else 0.0,
-                    "detected_area": {
-                        "has_detection": False,
-                        "bounding_box": None,
-                        "is_supported": False,
-                        "notes": "Localization is not supported by the DINOv2 image classification architecture."
-                    },
-                    "non_diagnostic_notice": (
-                        "Predictions from this machine learning model reflect statistical similarities to training datasets "
-                        "and do not constitute medical proof of disease."
-                    )
+                    "message": f"Network connection error while contacting Hugging Face: {str(net_err)}",
+                    "predictions": []
+                }
+            except httpx.TimeoutException:
+                return {
+                    "success": False,
+                    "status": "timeout",
+                    "model_id": self.model_id,
+                    "message": f"Hugging Face inference timed out after {self.REQUEST_TIMEOUT}s.",
+                    "predictions": []
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "status": "error",
+                    "model_id": self.model_id,
+                    "message": f"Hugging Face request failed: {str(e)}",
+                    "predictions": []
                 }
 
-        except httpx.TimeoutException:
-            return {
-                "success": False,
-                "status": "timeout",
-                "model_id": self.model_id,
-                "message": f"Hugging Face inference timed out after {self.REQUEST_TIMEOUT}s.",
-                "predictions": []
-            }
-        except Exception as err:
+        if raw_preds is None:
             return {
                 "success": False,
                 "status": "error",
                 "model_id": self.model_id,
-                "message": f"Hugging Face adapter communication error: {str(err)}",
+                "message": "Inference did not return a valid payload after retry.",
                 "predictions": []
             }
 

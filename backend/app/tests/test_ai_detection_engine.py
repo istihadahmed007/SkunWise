@@ -370,8 +370,10 @@ def test_12_invalid_model_response_handling():
         "candidates": [{"content": {"parts": [{"text": "THIS_IS_NOT_VALID_JSON"}]}}]
     }
 
-    with patch("httpx.post", return_value=mock_bad_resp):
-        res = vision_engine._infer_with_gemini(create_skin_fixture())
+    with patch.object(vision_engine, "is_configured", return_value=True), \
+         patch.object(vision_engine, "_get_api_key", return_value="mock-test-key-clinical"):
+        with patch("httpx.post", return_value=mock_bad_resp):
+            res = vision_engine._infer_with_gemini(create_skin_fixture())
     assert res["status"] == "failed"
     assert "malformed" in res["status_reason"].lower() or "json" in res["uncertainty_rationale"].lower()
 
@@ -379,8 +381,10 @@ def test_12_invalid_model_response_handling():
 def test_13_api_timeout_handling():
     """13. Network timeout during inference returns clear, actionable timeout message."""
     import httpx
-    with patch("httpx.post", side_effect=httpx.TimeoutException("Connection timed out")):
-        res = vision_engine._infer_with_gemini(create_skin_fixture())
+    with patch.object(vision_engine, "is_configured", return_value=True), \
+         patch.object(vision_engine, "_get_api_key", return_value="mock-test-key-clinical"):
+        with patch("httpx.post", side_effect=httpx.TimeoutException("Connection timed out")):
+            res = vision_engine._infer_with_gemini(create_skin_fixture())
     assert res["status"] == "failed"
     assert "timed out" in res["status_reason"].lower()
 

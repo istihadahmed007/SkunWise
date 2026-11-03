@@ -134,30 +134,35 @@ SUPPORTED_CONDITIONS = {
 
 class SkinRegionDetector:
     """
-    Biomedical skin-region identification across diverse Fitzpatrick phototypes (I to VI).
-    Transforms RGB into YCbCr and HSV color spaces to compute skin locus coverage.
+    Biomedical skin-region identification and lesion localization across diverse Fitzpatrick phototypes (I to VI).
+    Combines multi-color space chromaticity (YCbCr, normalized RGB, and HSV) with local luminance and texture metrics.
     Prevents out-of-distribution processing of non-skin images (e.g. documents, landscapes, pets).
     """
 
     @staticmethod
-    def evaluate_skin_presence(arr_rgb: np.ndarray) -> Tuple[bool, float, Dict[str, Any]]:
+    def get_skin_mask(arr_rgb: np.ndarray) -> np.ndarray:
         """
-        Calculates percentage of pixels exhibiting human skin chromaticity.
-        YCbCr parameters: Y > 20, 77 <= Cb <= 135, 130 <= Cr <= 180.
-        HSV parameters: H in [0, 50], S in [0.20, 0.75], V >= 0.20.
+        Computes binary skin mask using normalized chromaticity and multi-color-space rules
+        robust across Fitzpatrick I-VI without relying exclusively on fixed RGB thresholds.
         """
         r = arr_rgb[:, :, 0].astype(np.float32)
         g = arr_rgb[:, :, 1].astype(np.float32)
         b = arr_rgb[:, :, 2].astype(np.float32)
 
-        # Standard ITU-R BT.601 conversion to YCbCr
+        # 1. Standard ITU-R BT.601 conversion to YCbCr with melanin-inclusive bounds
         y = 0.299 * r + 0.587 * g + 0.114 * b
         cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b
         cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b
 
-        ycbcr_mask = (y > 15) & (cb >= 70) & (cb <= 142) & (cr >= 122) & (cr <= 185)
+        ycbcr_mask = (y > 15) & (cb >= 68) & (cb <= 145) & (cr >= 120) & (cr <= 188)
 
-        # HSV rule for melanin and light tones, plus red erythema wrapping around 360 degrees
+        # 2. Normalized RGB space (Kovac / Peer chromaticity locus across light and dark tones)
+        sum_rgb = r + g + b + 1e-5
+        r_norm = r / sum_rgb
+        g_norm = g / sum_rgb
+        norm_rgb_mask = (r_norm > 0.33) & (g_norm >= 0.20) & (g_norm <= 0.38) & (r >= g) & ((r - g) >= 3)
+
+        # 3. HSV rule for melanin and light tones, plus red erythema wrapping around 360 degrees
         max_c = np.maximum(np.maximum(r, g), b)
         min_c = np.minimum(np.minimum(r, g), b)
         delta = max_c - min_c + 1e-5
@@ -174,9 +179,14 @@ class SkinRegionDetector:
         s = delta / (max_c + 1e-5)
         v = max_c / 255.0
 
-        hsv_mask = ((h <= 55) | (h >= 330)) & (s >= 0.10) & (s <= 0.88) & (v >= 0.10)
+        hsv_mask = ((h <= 55) | (h >= 330)) & (s >= 0.08) & (s <= 0.88) & (v >= 0.08)
 
-        combined_mask = ycbcr_mask | hsv_mask
+        combined_mask = (ycbcr_mask | norm_rgb_mask) & (hsv_mask | norm_rgb_mask)
+        return combined_mask
+
+    @classmethod
+    def evaluate_skin_presence(cls, arr_rgb: np.ndarray) -> Tuple[bool, float, Dict[str, Any]]:
+        combined_mask = cls.get_skin_mask(arr_rgb)
         skin_pixel_count = int(np.count_nonzero(combined_mask))
         total_pixels = int(combined_mask.size)
         coverage_ratio = round(skin_pixel_count / max(1, total_pixels), 3)
@@ -187,8 +197,50 @@ class SkinRegionDetector:
         return is_skin, coverage_ratio, {
             "skin_coverage_ratio": coverage_ratio,
             "skin_detected": is_skin,
-            "phototype_spectrum_evaluated": "Fitzpatrick I–VI (Universal YCbCr/HSV)",
+            "phototype_spectrum_evaluated": "Fitzpatrick I–VI (Universal YCbCr/NormRGB/HSV)",
         }
+
+    @classmethod
+    def segment_lesion_region(
+        cls, arr_rgb: np.ndarray, skin_mask: Optional[np.ndarray] = None
+    ) -> Tuple[Optional[np.ndarray], Optional[Dict[str, int]]]:
+        """
+        Segments the primary affected dermatological lesion from surrounding normal skin.
+        Identifies contrast deviation (pigmentation or erythema) relative to background skin median.
+        """
+        if skin_mask is None:
+            skin_mask = cls.get_skin_mask(arr_rgb)
+
+        if not np.any(skin_mask):
+            return None, None
+
+        skin_pixels = arr_rgb[skin_mask]
+        median_skin = np.median(skin_pixels, axis=0)
+
+        # Color Euclidean distance from background skin median
+        diff = arr_rgb - median_skin
+        color_dist = np.sqrt(np.sum(diff ** 2, axis=2))
+
+        # Erythema contrast relative to skin median
+        r = arr_rgb[:, :, 0]
+        gb = (arr_rgb[:, :, 1] + arr_rgb[:, :, 2]) / 2.0 + 1e-5
+        erythema_ratio = r / gb
+        base_erythema = float(np.median(erythema_ratio[skin_mask]))
+        erythema_delta = np.maximum(0.0, erythema_ratio - base_erythema)
+
+        candidate_lesion = skin_mask & ((color_dist > 18.0) | (erythema_delta > 0.15))
+        lesion_count = int(np.count_nonzero(candidate_lesion))
+
+        total_skin = int(np.count_nonzero(skin_mask))
+        if lesion_count < max(30, int(total_skin * 0.003)) or lesion_count > int(total_skin * 0.85):
+            return None, None
+
+        rows, cols = np.where(candidate_lesion)
+        ymin, ymax = int(np.min(rows)), int(np.max(rows))
+        xmin, xmax = int(np.min(cols)), int(np.max(cols))
+
+        bbox = {"ymin": ymin, "xmin": xmin, "ymax": ymax, "xmax": xmax}
+        return candidate_lesion, bbox
 
 
 class VisionModelAdapter:
@@ -239,52 +291,100 @@ class VisionModelAdapter:
             "timestamp": time.time()
         }
 
-    def extract_morphological_features(self, arr: np.ndarray) -> Dict[str, float]:
+    def extract_morphological_features(self, arr: np.ndarray, skin_mask: Optional[np.ndarray] = None) -> Dict[str, float]:
         """
-        Extracts objective morphological parameters:
-        - Asymmetry index (0 to 1)
-        - Border irregularity variance
-        - Color variegation entropy
+        Extracts objective clinical morphological parameters (ABCD Rule):
+        - Asymmetry index calculated from localized lesion mask/crop (0 to 1)
+        - Border irregularity variance along the lesion boundary contour
+        - Color variegation entropy across lesion color distributions
         - Erythema saturation index
         """
-        # 1. Asymmetry
-        lr_diff = np.mean(np.abs(arr - np.fliplr(arr))) / 255.0
-        ud_diff = np.mean(np.abs(arr - np.flipud(arr))) / 255.0
-        asymmetry_score = round(float((lr_diff + ud_diff) / 2.0), 3)
+        # Segment lesion region from normal surrounding skin
+        lesion_mask, bbox = SkinRegionDetector.segment_lesion_region(arr, skin_mask)
 
-        # 2. Border Irregularity via Gradient Magnitude
-        gray = 0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1] + 0.114 * arr[:, :, 2]
-        gx, gy = np.gradient(gray)
-        grad_norm = np.sqrt(gx**2 + gy**2)
-        border_irregularity = round(float(np.std(grad_norm) / 50.0), 3)
+        # 1. Asymmetry: Computed on the localized lesion mask/crop rather than rectangular photo
+        if lesion_mask is not None and bbox is not None:
+            ymin, ymax, xmin, xmax = bbox["ymin"], bbox["ymax"], bbox["xmin"], bbox["xmax"]
+            h, w, _ = arr.shape
+            ymin_c = max(0, ymin - 2)
+            ymax_c = min(h, ymax + 3)
+            xmin_c = max(0, xmin - 2)
+            xmax_c = min(w, xmax + 3)
 
-        # 3. Color Variegation (Shannon Entropy across RGB histograms)
-        entropy_sum = 0.0
-        for c in range(3):
-            hist, _ = np.histogram(arr[:, :, c], bins=16, range=(0, 256), density=True)
-            hist = hist[hist > 0]
-            entropy_sum += -np.sum(hist * np.log2(hist))
-        color_entropy = round(float(entropy_sum / 3.0), 3)
+            cropped_mask = lesion_mask[ymin_c:ymax_c, xmin_c:xmax_c].astype(np.float32)
+            lr_flipped = np.fliplr(cropped_mask)
+            ud_flipped = np.flipud(cropped_mask)
 
-        # 4. Erythema (Red dominance over Green and Blue)
-        r = arr[:, :, 0]
-        g = arr[:, :, 1]
-        b = arr[:, :, 2]
-        total = r + g + b + 1e-5
-        erythema_saturation = round(float(np.mean(r / total)), 3)
+            union_lr = np.sum(np.maximum(cropped_mask, lr_flipped)) + 1e-5
+            diff_lr = np.sum(np.abs(cropped_mask - lr_flipped))
+            asym_lr = diff_lr / union_lr
+
+            union_ud = np.sum(np.maximum(cropped_mask, ud_flipped)) + 1e-5
+            diff_ud = np.sum(np.abs(cropped_mask - ud_flipped))
+            asym_ud = diff_ud / union_ud
+
+            asymmetry_score = round(float((asym_lr + asym_ud) / 2.0), 3)
+
+            # 2. Border Irregularity via gradient of cropped lesion
+            cropped_rgb = arr[ymin_c:ymax_c, xmin_c:xmax_c]
+            gray = 0.299 * cropped_rgb[:, :, 0] + 0.587 * cropped_rgb[:, :, 1] + 0.114 * cropped_rgb[:, :, 2]
+            gx, gy = np.gradient(gray)
+            grad_norm = np.sqrt(gx**2 + gy**2)
+            border_irregularity = round(float(np.std(grad_norm) / 50.0), 3)
+
+            # 3. Color Variegation on localized lesion pixels
+            lesion_pixels = arr[lesion_mask]
+            entropy_sum = 0.0
+            for c in range(3):
+                hist, _ = np.histogram(lesion_pixels[:, c], bins=16, range=(0, 256), density=True)
+                hist = hist[hist > 0]
+                entropy_sum += -np.sum(hist * np.log2(hist))
+            color_entropy = round(float(entropy_sum / 3.0), 3)
+
+            # 4. Erythema Saturation on localized lesion pixels
+            r_l = lesion_pixels[:, 0].astype(np.float32)
+            total_l = np.sum(lesion_pixels, axis=1) + 1e-5
+            erythema_saturation = round(float(np.mean(r_l / total_l)), 3)
+        else:
+            # Fallback when no localized focal lesion is segmented (e.g. diffuse rash / uniform skin)
+            if skin_mask is not None and np.any(skin_mask):
+                target_pixels = arr[skin_mask]
+            else:
+                target_pixels = arr.reshape(-1, 3)
+
+            gray = 0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1] + 0.114 * arr[:, :, 2]
+            gx, gy = np.gradient(gray)
+            grad_norm = np.sqrt(gx**2 + gy**2)
+            border_irregularity = round(float(np.std(grad_norm) / 50.0), 3)
+
+            lr_diff = np.mean(np.abs(arr - np.fliplr(arr))) / 255.0
+            ud_diff = np.mean(np.abs(arr - np.flipud(arr))) / 255.0
+            asymmetry_score = round(float((lr_diff + ud_diff) / 2.0), 3)
+
+            entropy_sum = 0.0
+            for c in range(3):
+                hist, _ = np.histogram(target_pixels[:, c], bins=16, range=(0, 256), density=True)
+                hist = hist[hist > 0]
+                entropy_sum += -np.sum(hist * np.log2(hist))
+            color_entropy = round(float(entropy_sum / 3.0), 3)
+
+            r_p = target_pixels[:, 0].astype(np.float32)
+            total_p = np.sum(target_pixels, axis=1) + 1e-5
+            erythema_saturation = round(float(np.mean(r_p / total_p)), 3)
 
         return {
             "asymmetry_score": asymmetry_score,
             "border_irregularity": border_irregularity,
             "color_entropy": color_entropy,
-            "erythema_saturation": erythema_saturation
+            "erythema_saturation": erythema_saturation,
+            "has_localized_lesion": bool(lesion_mask is not None)
         }
 
     def get_ai_engine_status(self) -> Dict[str, Any]:
         """
         Check and monitor live operational availability of integrated AI engines (Gemini and Hugging Face).
         """
-        gemini_ready = bool(self.api_key and len(self.api_key.strip()) > 5)
+        gemini_ready = self.is_configured()
         hf_ready = huggingface_adapter.is_configured()
         primary = getattr(settings, "PRIMARY_AI_PROVIDER", "gemini")
         hf_fallback_enabled = getattr(settings, "ENABLE_HUGGINGFACE_FALLBACK", False)
@@ -292,7 +392,7 @@ class VisionModelAdapter:
         return {
             "primary_provider": primary,
             "gemini": {
-                "model_id": os.getenv("GEMINI_MODEL", getattr(settings, "AI_MODEL_BACKBONE", "gemini-3.5-flash-lite")),
+                "model_id": getattr(settings, "GEMINI_MODEL", "gemini-3.5-flash-lite"),
                 "configured": gemini_ready,
                 "status": "ready" if gemini_ready else "unconfigured",
                 "supports_localization": True
@@ -690,8 +790,9 @@ Respond strictly with valid JSON conforming to this schema:
         # 1. Skin-Region Identification
         is_skin, coverage, skin_metrics = SkinRegionDetector.evaluate_skin_presence(arr)
 
-        # 2. Objective Morphological Metrics
-        features = self.extract_morphological_features(arr)
+        # 2. Objective Morphological Metrics (Localized Lesion-Mask Crop)
+        skin_mask = SkinRegionDetector.get_skin_mask(arr) if is_skin else None
+        features = self.extract_morphological_features(arr, skin_mask=skin_mask)
 
         # If photo does not contain sufficient skin pixels, flag as out-of-distribution
         if not is_skin:

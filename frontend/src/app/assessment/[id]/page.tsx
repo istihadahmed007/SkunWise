@@ -306,12 +306,31 @@ export default function AssessmentDetailPage() {
                     ? "উপসর্গভিত্তিক যত্ন: ছবির ফলাফল অনির্ণীত হলেও, নিচের পরামর্শসমূহ আপনার উল্লিখিত লক্ষণসমূহ ও ত্বকের স্বাভাবিক সুরক্ষার ওপর ভিত্তি করে তৈরি।"
                     : "Symptom-Based Care: While photographic classification was inconclusive, the care guidance below is based on your reported symptoms and gentle skin barrier support."}
                 </div>
+                <div className="pt-2">
+                  <Link
+                    href="/assess"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#328493] text-white text-xs font-bold hover:bg-[#256672] transition shadow-xs"
+                  >
+                    <span className="material-symbols-outlined text-sm">photo_camera</span>
+                    {language === "bn" ? "নতুন স্পষ্ট ছবি দিয়ে পুনরায় পরীক্ষা করুন" : "Retry with a clearer photo"}
+                  </Link>
+                </div>
               </div>
             ) : (
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-[#2b7f8f] block">
-                  {language === "bn" ? "সম্ভাব্য দৃশ্যমান লক্ষণ" : "Possible visible concern"}
-                </span>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#2b7f8f] block">
+                    {language === "bn" ? "সম্ভাব্য দৃশ্যমান লক্ষণ" : "Possible visible concern"}
+                  </span>
+                  {(triage.model_metadata?.top_label || triage.model_metadata?.original_label) && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                      <span className="font-semibold text-slate-500">
+                        {language === "bn" ? "মডেলের মূল লেবেল:" : "Original model label:"}
+                      </span>
+                      <span>{triage.model_metadata.top_label || triage.model_metadata.original_label}</span>
+                    </span>
+                  )}
+                </div>
                 <h3 className="font-headline font-extrabold text-2xl text-[#192531] mt-0.5">
                   {triage.main_finding || triage.primary_condition}
                 </h3>

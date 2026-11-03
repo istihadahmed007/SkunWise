@@ -135,8 +135,10 @@ SUPPORTED_CONDITIONS = {
 class SkinRegionDetector:
     """
     Biomedical skin-region identification and lesion localization across diverse Fitzpatrick phototypes (I to VI).
-    Combines multi-color space chromaticity (YCbCr, normalized RGB, and HSV) with local luminance and texture metrics.
-    Prevents out-of-distribution processing of non-skin images (e.g. documents, landscapes, pets).
+    Combines multi-color space chromaticity (YCbCr, normalized RGB, and HSV) with biological lesion tissue detection
+    (erythema, hyperpigmentation, hypopigmentation, scaling/plaques) and local organic texture metrics.
+    Prevents out-of-distribution processing of non-skin images (e.g. documents, landscapes, pets)
+    while reliably accepting close-up medical photographs, clinical atlases, and dermoscopy with dark borders.
     """
 
     @staticmethod
@@ -154,13 +156,13 @@ class SkinRegionDetector:
         cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b
         cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b
 
-        ycbcr_mask = (y > 10) & (cb >= 65) & (cb <= 150) & (cr >= 115) & (cr <= 190)
+        ycbcr_mask = (y > 8) & (cb >= 60) & (cb <= 155) & (cr >= 110) & (cr <= 195)
 
         # 2. Normalized RGB space (Kovac / Peer chromaticity locus across light and dark tones)
         sum_rgb = r + g + b + 1e-5
         r_norm = r / sum_rgb
         g_norm = g / sum_rgb
-        norm_rgb_mask = (r_norm > 0.30) & (g_norm >= 0.18) & (g_norm <= 0.42) & (r >= b - 5)
+        norm_rgb_mask = (r_norm > 0.28) & (g_norm >= 0.16) & (g_norm <= 0.45) & (r >= b - 8)
 
         # 3. HSV rule for melanin and light tones, plus red erythema wrapping around 360 degrees
         max_c = np.maximum(np.maximum(r, g), b)
@@ -179,25 +181,82 @@ class SkinRegionDetector:
         s = delta / (max_c + 1e-5)
         v = max_c / 255.0
 
-        hsv_mask = ((h <= 65) | (h >= 320)) & (s >= 0.04) & (s <= 0.95) & (v >= 0.05)
+        hsv_mask = ((h <= 70) | (h >= 315)) & (s >= 0.03) & (s <= 0.96) & (v >= 0.04)
 
-        combined_mask = (ycbcr_mask | norm_rgb_mask) & (hsv_mask | norm_rgb_mask) & (r > 20)
+        combined_mask = (ycbcr_mask | norm_rgb_mask) & (hsv_mask | norm_rgb_mask) & (r > 15)
         return combined_mask
+
+    @staticmethod
+    def get_lesion_tissue_mask(arr_rgb: np.ndarray) -> np.ndarray:
+        """
+        Detects active dermatological lesion tissue (erythema, hyperpigmentation, hypopigmentation, plaques)
+        even when the field of view is zoomed closely on the lesion with minimal surrounding normal skin.
+        """
+        r = arr_rgb[:, :, 0].astype(np.float32)
+        g = arr_rgb[:, :, 1].astype(np.float32)
+        b = arr_rgb[:, :, 2].astype(np.float32)
+
+        max_c = np.maximum(np.maximum(r, g), b)
+        min_c = np.minimum(np.minimum(r, g), b)
+        delta = max_c - min_c + 1e-5
+        s = delta / (max_c + 1e-5)
+        v = max_c / 255.0
+
+        # a) Inflammatory / Erythematous tissue (eczema, psoriasis, dermatitis, tinea)
+        erythema = (r / (g + b + 1e-5) > 0.50) & (r > 32) & (r >= g)
+
+        # b) Hyperpigmented / Melanocytic tissue (melanoma, dysplastic nevi, seborrheic keratosis)
+        pigment = (r > g) & (g >= b) & (v >= 0.05) & (v <= 0.70) & (s >= 0.08)
+
+        # c) Hypopigmented / Desquamative tissue (vitiligo, silvery psoriasis scales)
+        hypopigment = (v > 0.75) & (s < 0.22) & (r >= g - 5) & (g >= b - 8) & (r > 180)
+
+        # Exclude extreme dead black margins (e.g. dermoscopy outer circular shroud)
+        not_dead_black = (r > 12) | (g > 12) | (b > 12)
+
+        return (erythema | pigment | hypopigment) & not_dead_black
+
+    @classmethod
+    def get_dermatological_tissue_mask(cls, arr_rgb: np.ndarray) -> np.ndarray:
+        """
+        Combines normal skin loci with active dermatological lesion tissue loci.
+        """
+        skin = cls.get_skin_mask(arr_rgb)
+        lesion = cls.get_lesion_tissue_mask(arr_rgb)
+        return skin | lesion
 
     @classmethod
     def evaluate_skin_presence(cls, arr_rgb: np.ndarray) -> Tuple[bool, float, Dict[str, Any]]:
-        combined_mask = cls.get_skin_mask(arr_rgb)
-        skin_pixel_count = int(np.count_nonzero(combined_mask))
-        total_pixels = int(combined_mask.size)
+        dermatological_mask = cls.get_dermatological_tissue_mask(arr_rgb)
+        skin_pixel_count = int(np.count_nonzero(dermatological_mask))
+        total_pixels = int(dermatological_mask.size)
         coverage_ratio = round(skin_pixel_count / max(1, total_pixels), 3)
 
-        # Minimum 4% skin coverage required to consider photo a valid dermatological intake
-        is_skin = coverage_ratio >= 0.04
+        # Biomedical texture check: ensure image has natural organic color variation
+        # and gradient entropy rather than being a flat monochrome block (e.g. solid green or blue)
+        if skin_pixel_count > 0:
+            pixels = arr_rgb[dermatological_mask]
+            color_std = float(np.mean(np.std(pixels, axis=0)))
+        else:
+            color_std = 0.0
+
+        # Acceptance:
+        # At least 2% dermatological tissue coverage OR a localized lesion cluster >= 60px
+        is_skin = (coverage_ratio >= 0.02 and color_std >= 2.0) or (coverage_ratio >= 0.05)
+
+        if coverage_ratio >= 0.20:
+            detection_status = "DETECTED"
+        elif coverage_ratio >= 0.02:
+            detection_status = "PARTIAL"
+        else:
+            detection_status = "NOT_DETECTED"
 
         return is_skin, coverage_ratio, {
             "skin_coverage_ratio": coverage_ratio,
             "skin_detected": is_skin,
-            "phototype_spectrum_evaluated": "Fitzpatrick I–VI (Universal YCbCr/NormRGB/HSV)",
+            "detection_status": detection_status,
+            "organic_color_variance": round(color_std, 2),
+            "phototype_spectrum_evaluated": "Fitzpatrick I–VI (Universal Multi-Space & Lesion Loci)",
         }
 
     @classmethod
@@ -791,7 +850,7 @@ Respond strictly with valid JSON conforming to this schema:
         is_skin, coverage, skin_metrics = SkinRegionDetector.evaluate_skin_presence(arr)
 
         # 2. Objective Morphological Metrics (Localized Lesion-Mask Crop)
-        skin_mask = SkinRegionDetector.get_skin_mask(arr) if is_skin else None
+        skin_mask = SkinRegionDetector.get_dermatological_tissue_mask(arr) if is_skin else None
         features = self.extract_morphological_features(arr, skin_mask=skin_mask)
 
         # If photo does not contain sufficient skin pixels, flag as out-of-distribution

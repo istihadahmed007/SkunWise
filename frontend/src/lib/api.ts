@@ -46,6 +46,7 @@ export interface AuthResponse {
 
 export interface QualityMetrics {
   is_acceptable: boolean;
+  quality_tier?: "PASS" | "WARNING" | "REJECT" | string;
   sharpness_score: number;
   sharpness_status: string;
   ambient_lux: number;
@@ -55,6 +56,10 @@ export interface QualityMetrics {
   framing_status: string;
   overall_usability_score: number;
   quality_notes: string[];
+  failed_measurements?: string[];
+  quality_reasons?: string[];
+  local_contrast?: number;
+  compression_artifact_score?: number;
 }
 
 export interface ConditionMatch {
@@ -129,6 +134,14 @@ export interface TriageResult {
   recommended_skincare?: SkincareProductOption[];
   care_level?: string;
   practical_care_tips?: string[];
+  analysis_mode?: string;
+  reference_source_url?: string;
+  image_validation_status?: string;
+  image_quality_status?: string;
+  skin_detection_status?: string;
+  lesion_visibility_status?: string;
+  classification_status?: string;
+  uncertainty_status?: string;
 }
 
 export interface Assessment {
@@ -143,6 +156,9 @@ export interface Assessment {
   triage: TriageResult;
   is_archived: boolean;
   guest_access_token?: string | null;
+  analysis_mode?: string;
+  reference_source_url?: string;
+  pipeline_status?: Record<string, string>;
 }
 
 export interface Provider {
@@ -283,6 +299,8 @@ export interface SymptomInput {
   has_petechiae_or_purpura: boolean;
   consent_biometric: boolean;
   consent_disclaimer: boolean;
+  analysis_mode?: "personal" | "reference";
+  reference_source_url?: string;
 }
 
 function getAuthHeader(): HeadersInit {
@@ -382,6 +400,12 @@ export const api = {
     formData.append("anatomical_region", anatomicalRegion);
     formData.append("consent_biometric", String(Boolean(symptoms.consent_biometric)));
     formData.append("consent_disclaimer", String(Boolean(symptoms.consent_disclaimer)));
+    if (symptoms.analysis_mode) {
+      formData.append("analysis_mode", symptoms.analysis_mode);
+    }
+    if (symptoms.reference_source_url) {
+      formData.append("reference_source_url", symptoms.reference_source_url);
+    }
 
     const res = await fetch(`${base}/skin/analyze`, {
       method: "POST",

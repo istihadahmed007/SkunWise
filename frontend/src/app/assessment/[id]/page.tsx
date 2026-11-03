@@ -187,6 +187,69 @@ export default function AssessmentDetailPage() {
         </div>
       </div>
 
+      {/* Reference Image Analysis Banner */}
+      {(assessment.analysis_mode === "reference" || triage.analysis_mode === "reference") && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-[#e8f4f8] border border-[#b2dbe5] flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-2xl text-[#328493]">menu_book</span>
+            <div>
+              <h3 className="font-headline font-bold text-sm text-[#192531]">
+                {language === "bn"
+                  ? "রেফারেন্স মেডিকেল ছবি বিশ্লেষণ — অ-ব্যক্তিগত শিক্ষামূলক রেকর্ড"
+                  : "Educational Reference Image Analysis — Non-Personal Record"}
+              </h3>
+              <p className="text-xs text-[#526373] mt-0.5">
+                {language === "bn"
+                  ? "এই মূল্যায়নটি চিকিৎসা বই বা অনলাইন অ্যাটলাস রেফারেন্সের জন্য প্রস্তুত করা হয়েছে। কোনো ব্যক্তিগত উপসর্গ যুক্ত করা হয়নি।"
+                  : "This assessment was generated for an educational medical reference photograph without personal patient symptom context."}
+              </p>
+              {(assessment.reference_source_url || triage.reference_source_url) && (
+                <div className="mt-1.5 flex items-center gap-1 text-xs text-[#2b7f8f] font-semibold">
+                  <span className="material-symbols-outlined text-sm">link</span>
+                  <a
+                    href={assessment.reference_source_url || triage.reference_source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-[#216774] break-all"
+                  >
+                    {assessment.reference_source_url || triage.reference_source_url}
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+          <span className="px-3 py-1 rounded-full bg-white text-[#328493] text-xs font-bold border border-[#b2dbe5] shrink-0">
+            {language === "bn" ? "রেফারেন্স মোড" : "Atlas Mode"}
+          </span>
+        </div>
+      )}
+
+      {/* Quality Advisory Warning Banner */}
+      {assessment.quality_metrics?.quality_tier === "WARNING" && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+          <span className="material-symbols-outlined text-xl text-amber-700 mt-0.5 shrink-0">warning</span>
+          <div className="text-xs text-amber-900 leading-relaxed">
+            <strong className="font-bold block text-sm">
+              {language === "bn" ? "ছবির গুণগত সতর্কতা (Image Quality Advisory)" : "Image Quality Advisory"}
+            </strong>
+            <p className="mt-0.5">
+              {language === "bn"
+                ? "ছবিটিতে কিছুটা অস্পষ্টতা, নরম ফোকাস বা অসম আলো শনাক্ত হয়েছে। এআই সম্ভাব্য প্যাটার্ন শনাক্ত করেছে, তবে নির্ভরযোগ্যতার স্বার্থে প্রাকৃতিক আলোতে তোলা স্পষ্ট ছবির সাথে মিলিয়ে দেখার পরামর্শ দেওয়া হচ্ছে।"
+                : "Suboptimal lighting or soft focus was detected in this photograph. Visual condition patterns were identified with cautionary confidence; correlation with a higher-clarity photo in natural daylight is recommended."}
+            </p>
+            {assessment.quality_metrics?.quality_reasons && assessment.quality_metrics.quality_reasons.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {assessment.quality_metrics.quality_reasons.map((r, i) => (
+                  <span key={i} className="px-2.5 py-0.5 rounded-lg bg-amber-100/80 text-[11px] font-medium text-amber-900">
+                    {r}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* =========================================================================
           SECTION 1: MAIN FINDING
           - Plain-language description of visible concern
@@ -666,6 +729,53 @@ export default function AssessmentDetailPage() {
                   </li>
                 ))}
               </ul>
+            </div>
+
+            {/* Multi-Status Pipeline Transparency */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <h4 className="font-bold text-xs uppercase tracking-wide text-[#718292]">
+                {language === "bn" ? "ইমেজ ও এআই পাইপলাইন অবস্থা" : "Image & AI Pipeline Telemetry"}
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="p-2.5 rounded-xl bg-[#f4fafc] border border-[#d6e8f0]">
+                  <span className="text-[10px] text-slate-500 block">Image Validation</span>
+                  <span className="font-bold text-[#192531] text-xs">
+                    {assessment.pipeline_status?.image_validation_status || triage.image_validation_status || "VALID"}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#f4fafc] border border-[#d6e8f0]">
+                  <span className="text-[10px] text-slate-500 block">Image Quality</span>
+                  <span className={`font-bold text-xs ${
+                    (assessment.quality_metrics?.quality_tier === "WARNING") ? "text-amber-700" : "text-emerald-700"
+                  }`}>
+                    {assessment.quality_metrics?.quality_tier || assessment.pipeline_status?.image_quality_status || triage.image_quality_status || "PASS"}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#f4fafc] border border-[#d6e8f0]">
+                  <span className="text-[10px] text-slate-500 block">Skin & Tissue Detection</span>
+                  <span className="font-bold text-[#192531] text-xs">
+                    {assessment.pipeline_status?.skin_detection_status || triage.skin_detection_status || "DETECTED"}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#f4fafc] border border-[#d6e8f0]">
+                  <span className="text-[10px] text-slate-500 block">Lesion Visibility</span>
+                  <span className="font-bold text-[#192531] text-xs">
+                    {assessment.pipeline_status?.lesion_visibility_status || triage.lesion_visibility_status || "VISIBLE"}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#f4fafc] border border-[#d6e8f0]">
+                  <span className="text-[10px] text-slate-500 block">Inference Engine</span>
+                  <span className="font-bold text-[#192531] text-xs">
+                    {assessment.pipeline_status?.inference_status || triage.inference_status || "SUCCESSFUL"}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#f4fafc] border border-[#d6e8f0]">
+                  <span className="text-[10px] text-slate-500 block">Calibrated Uncertainty</span>
+                  <span className="font-bold text-[#192531] text-xs">
+                    {assessment.pipeline_status?.uncertainty_status || triage.uncertainty_status || "NORMAL"}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         )}

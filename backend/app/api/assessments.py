@@ -37,6 +37,8 @@ async def analyze_skin(
     anatomical_region: Optional[str] = Form("Volar Forearm"),
     consent_biometric: Optional[str] = Form(None, description="Explicit affirmative biometric intake consent"),
     consent_disclaimer: Optional[str] = Form(None, description="Explicit affirmative medical non-diagnostic disclaimer"),
+    analysis_mode: Optional[str] = Form("personal", description="Analysis mode: 'personal' or 'reference'"),
+    reference_source_url: Optional[str] = Form(None, description="Optional attribution or source URL for reference image"),
     user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
@@ -72,6 +74,11 @@ async def analyze_skin(
             symptom_dict["consent_biometric"] = True
         if "consent_disclaimer" not in symptom_dict:
             symptom_dict["consent_disclaimer"] = True
+
+        if "analysis_mode" not in symptom_dict and analysis_mode:
+            symptom_dict["analysis_mode"] = analysis_mode
+        if "reference_source_url" not in symptom_dict and reference_source_url:
+            symptom_dict["reference_source_url"] = reference_source_url
 
         symptoms = SymptomQuestionnaireInput(**symptom_dict)
     except HTTPException:
@@ -120,12 +127,23 @@ async def analyze_skin(
         raw_bytes, file.filename or "skin_photo.jpg", file.content_type
     )
 
-    # 3. Automated Image Quality & Optical Viability Evaluation
-    quality_metrics = evaluate_image_quality(clean_bytes)
-    is_quality_acceptable = quality_metrics["is_acceptable"]
-
-    # 4. Computer Vision Inference (Modular Pipeline with Skin Locus Validation)
+    # 3. Computer Vision Inference (Modular Pipeline with Skin Locus Validation)
     visual_findings = vision_engine.infer(clean_bytes)
+
+    # 4. Automated Image Quality & Optical Viability Evaluation
+    # Pass segmented skin/dermatological tissue mask if detected to evaluate quality regionally
+    skin_mask = None
+    if visual_findings.get("skin_detection", {}).get("skin_detected"):
+        try:
+            arr_eval = np.array(Image.open(io.BytesIO(clean_bytes)).convert("RGB").resize((256, 256)), dtype=np.float32)
+            from app.services.vision_engine import SkinRegionDetector
+            skin_mask = SkinRegionDetector.get_dermatological_tissue_mask(arr_eval)
+        except Exception:
+            skin_mask = None
+
+    quality_metrics = evaluate_image_quality(clean_bytes, skin_mask=skin_mask)
+    visual_findings["quality_metrics"] = quality_metrics
+    is_quality_acceptable = quality_metrics["is_acceptable"]
 
     # 5. Independent Safety Triage Engine (Emergency Red Flags Evaluated First)
     pathway = triage_service.determine_care_pathway(
@@ -202,6 +220,16 @@ async def analyze_skin(
     token_param = f"?guest_token={guest_access_token}" if guest_access_token else ""
     image_url = f"/api/skin/images/{saved_filename}{token_param}" if saved_filename != "EPHEMERAL_PURGED" else "/placeholder-ephemeral.png"
 
+    pipeline_status = {
+        "image_validation_status": triage_result.image_validation_status,
+        "image_quality_status": triage_result.image_quality_status,
+        "skin_detection_status": triage_result.skin_detection_status,
+        "lesion_visibility_status": triage_result.lesion_visibility_status,
+        "inference_status": str(visual_findings.get("inference_status", "inconclusive")).upper(),
+        "classification_status": triage_result.classification_status,
+        "uncertainty_status": triage_result.uncertainty_status
+    }
+
     return AssessmentResponse(
         id=assessment.id,
         session_code=assessment.session_code,
@@ -213,7 +241,10 @@ async def analyze_skin(
         symptom_data=assessment.symptom_data,
         triage=triage_result,
         is_archived=assessment.is_archived,
-        guest_access_token=guest_access_token
+        guest_access_token=guest_access_token,
+        analysis_mode=triage_result.analysis_mode,
+        reference_source_url=triage_result.reference_source_url,
+        pipeline_status=pipeline_status
     )
 
 
@@ -292,6 +323,23 @@ def get_assessment(
         practical_care_tips=guidance.get("practical_care_tips", [])
     )
 
+    symptom_dict_saved = assessment.symptom_data or {}
+    mode_saved = symptom_dict_saved.get("analysis_mode", "personal")
+    ref_url_saved = symptom_dict_saved.get("reference_source_url")
+
+    qual_metrics = assessment.quality_metrics or {}
+    qual_tier = qual_metrics.get("quality_tier", "PASS" if qual_metrics.get("is_acceptable", True) else "REJECT")
+
+    pipeline_status = {
+        "image_validation_status": "VALID",
+        "image_quality_status": qual_tier,
+        "skin_detection_status": "DETECTED" if not assessment.is_inconclusive else "PARTIAL",
+        "lesion_visibility_status": "VISIBLE" if not assessment.is_inconclusive else "OBSCURED",
+        "inference_status": str((getattr(assessment, "ai_predictions", {}) or {}).get("inference_status", "inconclusive")).upper(),
+        "classification_status": "MATCHED" if not assessment.is_inconclusive else "OUT_OF_DISTRIBUTION",
+        "uncertainty_status": "MODERATE"
+    }
+
     return AssessmentResponse(
         id=assessment.id,
         session_code=assessment.session_code,
@@ -299,11 +347,14 @@ def get_assessment(
         anatomical_region=assessment.anatomical_region,
         created_at=assessment.created_at,
         image_url=image_url,
-        quality_metrics=QualityMetricsModel(**assessment.quality_metrics),
+        quality_metrics=QualityMetricsModel(**qual_metrics),
         symptom_data=assessment.symptom_data,
         triage=triage_model,
         is_archived=assessment.is_archived,
-        guest_access_token=guest_token
+        guest_access_token=guest_token,
+        analysis_mode=mode_saved,
+        reference_source_url=ref_url_saved,
+        pipeline_status=pipeline_status
     )
 
 

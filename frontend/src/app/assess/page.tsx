@@ -7,13 +7,20 @@ import { useLanguage } from "@/context/LanguageContext";
 import { BodyMapSelector } from "@/components/BodyMapSelector";
 
 interface PhotoFeedback {
-  type: "idle" | "good" | "dark" | "bright" | "small";
+  type: "idle" | "good" | "warning" | "dark" | "bright" | "small";
   message: string;
+  resolutionText?: string;
+  sharpnessText?: string;
+  lightingText?: string;
 }
 
 export default function AssessPage() {
   const router = useRouter();
   const { t, language } = useLanguage();
+
+  // Mode Selection: "personal" (My Skin Photo) vs "reference" (Educational Reference Image)
+  const [analysisMode, setAnalysisMode] = useState<"personal" | "reference">("personal");
+  const [referenceSourceUrl, setReferenceSourceUrl] = useState<string>("");
 
   // Workflow steps: 1 = Photo Intake, 2 = Symptom Questions, 3 = Review & Submit
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -163,7 +170,7 @@ export default function AssessPage() {
     }
   }, []);
 
-  // Real client-side photo check (brightness & dimensions)
+  // Real client-side photo check (region-aware brightness, resolution, and edge contrast)
   const analyzePhotoLocally = (file: File) => {
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
@@ -172,18 +179,22 @@ export default function AssessPage() {
       URL.revokeObjectURL(objectUrl);
 
       // Check resolution
-      if (img.width < 240 || img.height < 240) {
+      const resText = `${img.width}x${img.height}px`;
+      if (img.width < 200 || img.height < 200) {
         setPhotoFeedback({
           type: "small",
           message:
             language === "bn"
-              ? "ছবিটি বেশ ছোট বা অস্পষ্ট। স্পষ্ট ফলাফলের জন্য আরও স্পষ্ট ও বড় ছবি দিন।"
-              : "This photo is small or low-resolution. A clearer, closer photo works best.",
+              ? "ছবিটি বেশ ছোট (সর্বনিম্ন ২০০x২০০ পিক্সেল আবশ্যক)। স্পষ্ট ফলাফলের জন্য পরিষ্কার ছবি দিন।"
+              : "This photo resolution is too low. A clearer, closer photo of at least 200x200px works best.",
+          resolutionText: resText,
+          sharpnessText: language === "bn" ? "খুব কম" : "Low",
+          lightingText: language === "bn" ? "অনিশ্চিত" : "Uncertain",
         });
         return;
       }
 
-      // Check lighting on small canvas
+      // Check central 70% lighting on canvas (protects against dark dermoscopy borders or drapes)
       try {
         const canvas = document.createElement("canvas");
         canvas.width = 64;
@@ -193,36 +204,76 @@ export default function AssessPage() {
           ctx.drawImage(img, 0, 0, 64, 64);
           const imgData = ctx.getImageData(0, 0, 64, 64);
           const data = imgData.data;
-          let totalLuminance = 0;
-          for (let i = 0; i < data.length; i += 4) {
-            totalLuminance +=
-              0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-          }
-          const avgLuminance = totalLuminance / (64 * 64);
 
-          if (avgLuminance < 45) {
+          let centralLuminance = 0;
+          let centralCount = 0;
+          let diffSum = 0;
+
+          for (let y = 10; y < 54; y++) {
+            for (let x = 10; x < 54; x++) {
+              const idx = (y * 64 + x) * 4;
+              const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+              centralLuminance += lum;
+              centralCount++;
+
+              if (x < 53) {
+                const nextIdx = (y * 64 + x + 1) * 4;
+                const nextLum = 0.299 * data[nextIdx] + 0.587 * data[nextIdx + 1] + 0.114 * data[nextIdx + 2];
+                diffSum += Math.abs(lum - nextLum);
+              }
+            }
+          }
+
+          const avgLuminance = centralLuminance / Math.max(1, centralCount);
+          const edgeIndex = diffSum / Math.max(1, centralCount);
+
+          const sharpnessLabel = edgeIndex > 4.5
+            ? (language === "bn" ? "স্পষ্ট ও ফোকাসযুক্ত" : "In focus")
+            : (language === "bn" ? "কিছুটা নরম ফোকাস" : "Soft focus");
+
+          if (avgLuminance < 30) {
             setPhotoFeedback({
               type: "dark",
               message:
                 language === "bn"
-                  ? "ছবিটি অন্ধকার দেখাচ্ছে। ভালো ফলাফলের জন্য পর্যাপ্ত আলো বা জানালার কাছে ছবি তুলুন।"
-                  : "The photo looks dark. For clearer results, take the photo near a window or in good lighting.",
+                  ? "ছবিটির কেন্দ্রীয় অংশ বেশ অন্ধকার দেখাচ্ছে। জানালার আলোতে বা পর্যাপ্ত আলোতে ছবি তুললে ভালো ফলাফল মিলবে।"
+                  : "The central skin area looks underexposed. Capture in daylight for highest accuracy.",
+              resolutionText: resText,
+              sharpnessText: sharpnessLabel,
+              lightingText: language === "bn" ? "অতিরিক্ত অন্ধকার" : "Underexposed",
             });
-          } else if (avgLuminance > 225) {
+          } else if (avgLuminance > 238) {
             setPhotoFeedback({
               type: "bright",
               message:
                 language === "bn"
-                  ? "ছবিটিতে অতিরিক্ত আলো বা ফ্ল্যাশ পড়েছে। ফ্ল্যাশ বন্ধ করে ছবি তোলার চেষ্টা করুন।"
-                  : "The photo is very bright with glare. Try turning off camera flash.",
+                  ? "ছবিটিতে অতিরিক্ত আলো বা ফ্ল্যাশ পড়েছে। ফ্ল্যাশ ছাড়া ছবি তোলার চেষ্টা করুন।"
+                  : "The photo has intense glare or overexposure. Try capturing without camera flash.",
+              resolutionText: resText,
+              sharpnessText: sharpnessLabel,
+              lightingText: language === "bn" ? "অতিরিক্ত আলো" : "Overexposed",
+            });
+          } else if (edgeIndex < 2.5) {
+            setPhotoFeedback({
+              type: "warning",
+              message:
+                language === "bn"
+                  ? "ছবির ফোকাস কিছুটা নরম বা ঝাপসা। স্পষ্ট রেজাল্টের জন্য হাত স্থির রেখে ফোকাস লক করে ছবি তুলুন।"
+                  : "Photo has soft focus. Hold the camera steady for crisp feature detection.",
+              resolutionText: resText,
+              sharpnessText: sharpnessLabel,
+              lightingText: language === "bn" ? "পর্যাপ্ত আলো" : "Good lighting",
             });
           } else {
             setPhotoFeedback({
               type: "good",
               message:
                 language === "bn"
-                  ? "ছবির আলো এবং স্পষ্টতা ভালো মনে হচ্ছে। পরবর্তী ধাপে যেতে পারেন।"
-                  : "Photo lighting and focus look good. Ready for the next step.",
+                  ? "ছবির স্পষ্টতা ও আলোর ভারসাম্য খুব ভালো। পরবর্তী ধাপে যেতে পারেন।"
+                  : "Photo clarity and lighting look good. Ready for analysis.",
+              resolutionText: resText,
+              sharpnessText: sharpnessLabel,
+              lightingText: language === "bn" ? "সুষম প্রাকৃতিক আলো" : "Balanced lighting",
             });
           }
         }
@@ -230,9 +281,10 @@ export default function AssessPage() {
         setPhotoFeedback({
           type: "good",
           message:
-            language === "bn"
-              ? "ছবি সংযুক্ত হয়েছে।"
-              : "Photo attached and ready.",
+            language === "bn" ? "ছবি প্রস্তুত রয়েছে।" : "Photo attached and ready.",
+          resolutionText: resText,
+          sharpnessText: language === "bn" ? "উপযুক্ত" : "Suitable",
+          lightingText: language === "bn" ? "স্বাভাবিক" : "Normal",
         });
       }
     };
@@ -319,6 +371,8 @@ export default function AssessPage() {
       has_petechiae_or_purpura: false,
       consent_biometric: consentBiometric,
       consent_disclaimer: consentDisclaimer,
+      analysis_mode: analysisMode,
+      reference_source_url: analysisMode === "reference" && referenceSourceUrl.trim() ? referenceSourceUrl.trim() : undefined,
     };
 
     try {
@@ -418,7 +472,67 @@ export default function AssessPage() {
 
       {/* STEP 1: PHOTO INTAKE */}
       {currentStep === 1 && (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+        <div className="space-y-6">
+          {/* Analysis Mode Selector */}
+          <div className="bg-white/90 backdrop-blur-md rounded-3xl p-5 border border-white/80 shadow-xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold text-[#328493] uppercase tracking-wider">
+                  {language === "bn" ? "বিশ্লেষণের ধরন নির্বাচন করুন" : "Choose Analysis Mode"}
+                </span>
+                <p className="text-xs text-[#526373] mt-0.5">
+                  {language === "bn"
+                    ? "আপনার নিজের ত্বকের যত্ন না কি কোনো রেফারেন্স মেডিকেল ছবি বিশ্লেষণ করতে চান?"
+                    : "Are you checking your personal skin concern or analyzing an educational atlas image?"}
+                </p>
+              </div>
+              <div className="inline-flex rounded-2xl bg-[#e8f4f8] p-1 border border-[#cce4ee] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setAnalysisMode("personal")}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-headline font-bold transition-all cursor-pointer ${
+                    analysisMode === "personal"
+                      ? "bg-[#4da8b9] text-white shadow-xs"
+                      : "text-[#526373] hover:text-[#1c2834]"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">person</span>
+                  <span>{language === "bn" ? "আমার ত্বকের ছবি" : "My Skin Photo"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnalysisMode("reference")}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-headline font-bold transition-all cursor-pointer ${
+                    analysisMode === "reference"
+                      ? "bg-[#4da8b9] text-white shadow-xs"
+                      : "text-[#526373] hover:text-[#1c2834]"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">menu_book</span>
+                  <span>{language === "bn" ? "রেফারেন্স মেডিকেল ছবি" : "Reference Atlas"}</span>
+                </button>
+              </div>
+            </div>
+
+            {analysisMode === "reference" && (
+              <div className="mt-4 pt-3 border-t border-[#d8edf3] flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <span className="material-symbols-outlined text-base text-[#328493] shrink-0">link</span>
+                <input
+                  type="url"
+                  value={referenceSourceUrl}
+                  onChange={(e) => setReferenceSourceUrl(e.target.value)}
+                  placeholder={
+                    language === "bn"
+                      ? "ছবির অনলাইন উৎস বা তথ্যসূত্র URL (ঐচ্ছিক, যেমন: DermNet / Atlas লিংক)"
+                      : "Reference image URL or atlas attribution (optional, e.g. DermNet / textbook link)"
+                  }
+                  className="w-full text-xs px-3 py-2 rounded-xl border border-[#cce4ee] bg-white text-[#1c2834] focus:outline-none focus:ring-2 focus:ring-[#4da8b9]"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           {/* Left Column: Photo Preview or Upload Drop Zone (7 cols) */}
           <div className="md:col-span-7 bg-white/90 backdrop-blur-md rounded-3xl p-6 border border-white/80 shadow-xs space-y-4">
             {/* Hidden file inputs */}
@@ -533,21 +647,47 @@ export default function AssessPage() {
               </button>
             </div>
 
-            {/* Real Client-Side Image Feedback */}
+            {/* Real Client-Side Image Pre-Check Card */}
             {photoFeedback.type !== "idle" && (
               <div
-                className={`p-3.5 rounded-2xl text-xs flex items-start gap-2.5 transition-all ${
+                className={`p-4 rounded-2xl text-xs space-y-2.5 transition-all ${
                   photoFeedback.type === "good"
-                    ? "bg-emerald-50 text-emerald-900 border border-emerald-200"
-                    : "bg-amber-50 text-amber-900 border border-amber-200"
+                    ? "bg-emerald-50/80 text-emerald-950 border border-emerald-200"
+                    : photoFeedback.type === "warning"
+                    ? "bg-amber-50/80 text-amber-950 border border-amber-200"
+                    : "bg-rose-50/80 text-rose-950 border border-rose-200"
                 }`}
                 role="status"
                 aria-live="polite"
               >
-                <span className="material-symbols-outlined text-base mt-0.5 shrink-0">
-                  {photoFeedback.type === "good" ? "check_circle" : "lightbulb"}
-                </span>
-                <p className="leading-relaxed">{photoFeedback.message}</p>
+                <div className="flex items-start gap-2.5">
+                  <span className="material-symbols-outlined text-base mt-0.5 shrink-0">
+                    {photoFeedback.type === "good" ? "check_circle" : "info"}
+                  </span>
+                  <p className="leading-relaxed font-medium">{photoFeedback.message}</p>
+                </div>
+
+                {/* Multi-Metric Pre-Check Badges */}
+                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-black/5 text-[11px]">
+                  <div className="bg-white/80 rounded-xl p-2 text-center">
+                    <span className="text-[10px] text-slate-500 block uppercase font-bold">
+                      {language === "bn" ? "রেজোলিউশন" : "Resolution"}
+                    </span>
+                    <span className="font-semibold text-slate-800">{photoFeedback.resolutionText || "—"}</span>
+                  </div>
+                  <div className="bg-white/80 rounded-xl p-2 text-center">
+                    <span className="text-[10px] text-slate-500 block uppercase font-bold">
+                      {language === "bn" ? "ফোকাস" : "Sharpness"}
+                    </span>
+                    <span className="font-semibold text-slate-800">{photoFeedback.sharpnessText || "—"}</span>
+                  </div>
+                  <div className="bg-white/80 rounded-xl p-2 text-center">
+                    <span className="text-[10px] text-slate-500 block uppercase font-bold">
+                      {language === "bn" ? "আলো" : "Lighting"}
+                    </span>
+                    <span className="font-semibold text-slate-800">{photoFeedback.lightingText || "—"}</span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -695,11 +835,40 @@ export default function AssessPage() {
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* STEP 2: SHORT SYMPTOM QUESTIONS */}
       {currentStep === 2 && (
         <div className="max-w-3xl mx-auto space-y-6">
+          {/* Reference Mode Shortcut Banner */}
+          {analysisMode === "reference" && (
+            <div className="bg-white/90 backdrop-blur-md rounded-3xl p-5 border border-[#b2dbe5] shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#e8f4f8] text-[#328493] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-xl">menu_book</span>
+                </div>
+                <div>
+                  <h4 className="font-headline font-bold text-sm text-[#1c2834]">
+                    {language === "bn" ? "রেফারেন্স মেডিকেল ছবি মোড সক্রিয়" : "Reference Medical Atlas Mode Active"}
+                  </h4>
+                  <p className="text-xs text-[#526373] mt-0.5">
+                    {language === "bn"
+                      ? "ব্যক্তিগত উপসর্গ ও ইতিহাসের তথ্য রেফারেন্স ছবির জন্য বাধ্যতামূলক নয়। আপনি চাইলে সরাসরি বিশ্লেষণ চালাতে পারেন।"
+                      : "Personal symptom scores are not required for educational atlas images. You can run direct pattern inference immediately."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={submitAssessment}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-[#4da8b9] hover:bg-[#3a96a7] text-white font-headline text-xs font-bold shrink-0 transition-all shadow-xs cursor-pointer active:scale-98"
+              >
+                {language === "bn" ? "সরাসরি বিশ্লেষণ করুন" : "Analyze Directly"}
+              </button>
+            </div>
+          )}
+
           <div className="bg-white/90 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/80 shadow-xs space-y-6">
             {/* 1. Body Location - Interactive Anatomical Selector */}
             <div className="space-y-2.5">

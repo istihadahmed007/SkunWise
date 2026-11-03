@@ -499,6 +499,8 @@ class RecommendationEngine:
         # Sort highest concordance first
         weighted.sort(key=lambda x: x[1], reverse=True)
 
+        is_reference_mode = getattr(symptoms, "analysis_mode", "personal") == "reference"
+
         for rank, (cond_key, score) in enumerate(weighted[:3]):
             # Only include conditions with meaningful support or direct model match
             if score < 0.20 and cond_key != matched_cat:
@@ -516,7 +518,33 @@ class RecommendationEngine:
             if not model_display_name:
                 model_display_name = kb_data.get("title", cond_key)
 
-            if cond_key == "eczema_contact_dermatitis":
+            if is_reference_mode:
+                history_corr = "Reference image pattern analysis (personal symptoms not correlated)"
+                if cond_key == "eczema_contact_dermatitis":
+                    visual_overlap = "Visible erythema, dry surface texture, or lichenified irritation"
+                elif cond_key == "benign_melanocytic_macule":
+                    visual_overlap = "Uniform pigment network, regular perimeter, symmetric macule"
+                elif cond_key == "suspicious_dysplastic_lesion":
+                    visual_overlap = "Asymmetric pigment distribution, border irregularity, or color variegation"
+                elif cond_key == "psoriasis":
+                    visual_overlap = "Sharply demarcated erythematous plaque with silvery scale"
+                elif cond_key == "fungal_tinea":
+                    visual_overlap = "Annular configuration with advancing scaly active border"
+                elif cond_key == "acne_vulgaris":
+                    visual_overlap = "Comedones, inflammatory papules, or follicular pustules"
+                elif cond_key == "herpes_simplex":
+                    visual_overlap = "Clustered vesicular pattern on an erythematous base"
+                elif cond_key == "impetigo":
+                    visual_overlap = "Honey-colored serous crusts or superficial erosion"
+                elif cond_key == "lichen_planus":
+                    visual_overlap = "Violaceous flat-topped polygonal papular morphology"
+                elif cond_key == "molluscum_contagiosum":
+                    visual_overlap = "Discrete umbilicated pearly papules"
+                elif cond_key == "pityriasis_rosea":
+                    visual_overlap = "Oval scaly herald patch / collarette of scale"
+                else:
+                    visual_overlap = "Specialized dermatological morphological pattern"
+            elif cond_key == "eczema_contact_dermatitis":
                 visual_overlap = "Visible redness, dry texture, or surface irritation"
                 history_corr = f"Reported itch: {symptoms.itch_score}/10"
             elif cond_key == "benign_melanocytic_macule":
@@ -685,17 +713,21 @@ class RecommendationEngine:
         Strictly distinguishes image analysis status (successful, inconclusive, unavailable, failed)
         from symptom-based safety triage.
         """
+        quality_info = visual_findings.get("quality_metrics") or {}
+        quality_tier = quality_info.get("quality_tier", "PASS" if is_quality_acceptable else "REJECT")
+        is_quality_reject = (quality_tier == "REJECT") or (not is_quality_acceptable)
+
         inference_status = visual_findings.get("inference_status", "inconclusive")
         is_inconclusive = (
-            (not is_quality_acceptable)
+            is_quality_reject
             or visual_findings.get("is_inconclusive", True)
             or (inference_status != "successful")
         )
 
         # Build safe, clear inconclusive reason and main finding
-        if not is_quality_acceptable:
-            inconclusive_reason = "The photo was unclear or lighting was insufficient. Please retake the photo in natural light or see a doctor."
-            main_finding = "Photo quality notice: Image was unclear or had suboptimal lighting for automated analysis."
+        if is_quality_reject:
+            inconclusive_reason = "The photo was unclear, severely blurred, or lighting was insufficient. Please retake the photo in natural light or see a doctor."
+            main_finding = "Photo quality notice: Image was ungradable due to optical quality or lighting limits."
             status_for_model = "inconclusive"
         elif inference_status == "unavailable":
             inconclusive_reason = visual_findings.get("inference_status_reason", "Automated visual analysis is unconfigured or offline.")
@@ -721,6 +753,8 @@ class RecommendationEngine:
         ]
         if is_inconclusive:
             diagnostic_gaps.insert(0, f"Analysis status: {inconclusive_reason}")
+        elif quality_tier == "WARNING":
+            diagnostic_gaps.insert(0, "Image quality notice: Image has suboptimal lighting or soft focus. Pattern predictions are provided with cautionary confidence.")
 
         # Synthesize possible conditions ONLY if visual inference was successful
         if is_inconclusive:
@@ -750,6 +784,26 @@ class RecommendationEngine:
                 "uncertainty_rationale",
                 "Automated visual pattern match. Medical evaluation required for clinical diagnosis."
             )
+
+        # Reference Mode Adaptations
+        analysis_mode = getattr(symptoms, "analysis_mode", "personal")
+        reference_source_url = getattr(symptoms, "reference_source_url", None)
+        is_reference = (analysis_mode == "reference")
+
+        triage_tier = triage_pathway["triage_tier"]
+        triage_name = triage_pathway["triage_name"]
+        timeline = triage_pathway["recommended_timeline"]
+        badge_color = triage_pathway["urgency_badge_color"]
+        rationale = triage_pathway["rationale"]
+
+        if is_reference:
+            triage_name = "Educational Reference Image Analysis"
+            timeline = "Educational / Clinical Comparison"
+            rationale = "Analysis performed in Educational Reference mode. Visual patterns are matched against medical dermatology atlases without personal patient symptoms."
+            if not is_inconclusive and primary_condition != "Inconclusive Visual Observation":
+                main_finding = f"Reference Pattern Match: {primary_condition}"
+                if quality_tier == "WARNING":
+                    main_finding += " (Suboptimal Photo Quality)"
 
         # 1. Cosmetic Skin Type (Cleanly separated from disease analysis)
         cosmetic_skin_type = cls.evaluate_cosmetic_skin_type(symptoms, visual_findings)
@@ -821,13 +875,22 @@ class RecommendationEngine:
                 "status": gen_kb["approval_status"]
             })
 
+        # Multi-Status Pipeline Transparency Resolution
+        image_val_status = "VALID"
+        image_qual_status = quality_tier
+        skin_detection_data = visual_findings.get("skin_detection") or {}
+        skin_det_status = skin_detection_data.get("detection_status", "DETECTED" if skin_detection_data.get("skin_detected") else "NOT_DETECTED")
+        lesion_vis_status = "VISIBLE" if (detected_area and detected_area.has_detection) else ("NOT_FOUND" if is_inconclusive else "OBSCURED")
+        classification_stat = "MATCHED" if (possible_conditions and not is_inconclusive) else ("OUT_OF_DISTRIBUTION" if visual_findings.get("uncertainty_metrics", {}).get("is_out_of_distribution") else "UNSUPPORTED")
+        uncertainty_stat = str(visual_findings.get("uncertainty_metrics", {}).get("uncertainty_level", "MODERATE")).upper()
+
         return TriageResultModel(
-            triage_tier=triage_pathway["triage_tier"],
-            triage_name=triage_pathway["triage_name"],
-            recommended_timeline=triage_pathway["recommended_timeline"],
-            urgency_badge_color=triage_pathway["urgency_badge_color"],
+            triage_tier=triage_tier,
+            triage_name=triage_name,
+            recommended_timeline=timeline,
+            urgency_badge_color=badge_color,
             primary_condition=primary_condition,
-            rationale=triage_pathway["rationale"],
+            rationale=rationale,
             emergency_warning_detected=triage_pathway.get("emergency_warning_detected", False),
             emergency_warning_items=triage_pathway.get("emergency_warning_items", []),
             is_inconclusive=is_inconclusive,
@@ -854,7 +917,15 @@ class RecommendationEngine:
             detected_area=detected_area,
             recommended_skincare=recommended_skincare,
             care_level=care_level,
-            practical_care_tips=practical_care_tips
+            practical_care_tips=practical_care_tips,
+            analysis_mode=analysis_mode,
+            reference_source_url=reference_source_url,
+            image_validation_status=image_val_status,
+            image_quality_status=image_qual_status,
+            skin_detection_status=skin_det_status,
+            lesion_visibility_status=lesion_vis_status,
+            classification_status=classification_stat,
+            uncertainty_status=uncertainty_stat
         )
 
 recommendation_engine = RecommendationEngine()

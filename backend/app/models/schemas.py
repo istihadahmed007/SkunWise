@@ -173,6 +173,10 @@ class SymptomQuestionnaireInput(BaseModel):
     has_rapid_blistering_or_peeling: bool = Field(False, description="Widespread blistering or skin peeling")
     has_petechiae_or_purpura: bool = Field(False, description="Dark purple non-blanching spots with fever")
 
+    # Mode Selection & Attribution (Personal vs Reference Image)
+    analysis_mode: str = Field("personal", description="Analysis mode: 'personal' for personal triage, 'reference' for reference medical atlas image")
+    reference_source_url: Optional[str] = Field(None, description="Optional source or attribution URL for reference image mode")
+
 class CosmeticSkinTypeModel(BaseModel):
     skin_type: str = "Normal / Balanced"
     explanation: str = "Balanced oil and hydration levels reported."
@@ -198,6 +202,7 @@ class SkincareProductOptionModel(BaseModel):
 
 class QualityMetricsModel(BaseModel):
     is_acceptable: bool
+    quality_tier: str = "PASS"  # "PASS" | "WARNING" | "REJECT"
     sharpness_score: float
     sharpness_status: str
     ambient_lux: float
@@ -207,6 +212,10 @@ class QualityMetricsModel(BaseModel):
     framing_status: str
     overall_usability_score: int
     quality_notes: List[str]
+    failed_measurements: List[str] = Field(default_factory=list)
+    quality_reasons: List[str] = Field(default_factory=list)
+    local_contrast: float = 0.0
+    compression_artifact_score: float = 0.0
 
 class ConditionMatchModel(BaseModel):
     condition_id: str
@@ -249,6 +258,16 @@ class TriageResultModel(BaseModel):
     care_level: str = "General self-care"
     practical_care_tips: List[str] = Field(default_factory=list)
 
+    # Multi-Status Pipeline Transparency & Analysis Mode
+    analysis_mode: str = "personal"
+    reference_source_url: Optional[str] = None
+    image_validation_status: str = "VALID"
+    image_quality_status: str = "PASS"
+    skin_detection_status: str = "DETECTED"
+    lesion_visibility_status: str = "VISIBLE"
+    classification_status: str = "MATCHED"
+    uncertainty_status: str = "MODERATE"
+
 class AssessmentResponse(BaseModel):
     id: int
     session_code: str
@@ -261,6 +280,9 @@ class AssessmentResponse(BaseModel):
     triage: TriageResultModel
     is_archived: bool
     guest_access_token: Optional[str] = None
+    analysis_mode: str = "personal"
+    reference_source_url: Optional[str] = None
+    pipeline_status: Optional[Dict[str, str]] = None
 
 class AssessmentSummaryItem(BaseModel):
     id: int
